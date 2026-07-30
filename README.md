@@ -9,8 +9,15 @@
 
 A smartphone game where you photograph a tree branch (or other natural object) outdoors, the photo produces a battle card with stats, and you battle with that card. The goal is to get people outside, moving, and in contact with nature. Generation runs on-device — nothing is sent to the cloud.
 
-実装計画の詳細は [`docs/game-mvp-plan.md`](./docs/game-mvp-plan.md) を参照してください。
-See [`docs/game-mvp-plan.md`](./docs/game-mvp-plan.md) for the detailed implementation plan.
+撮った枝は「武器」になり、**武器のジャンル**と**属性**がステータスに補正をかけます。
+
+The branch you photograph becomes a **weapon**; its **genre** and **element** modify its stats.
+
+| 文書 / Document | 内容 / Contents |
+| --- | --- |
+| [`docs/game-design.md`](./docs/game-design.md) | **何を作るか** — 体験の核、進行、カード生成の骨格、屋外要素、アート要件、安全・プライバシー |
+| [`docs/game-mvp-plan.md`](./docs/game-mvp-plan.md) | **どう作るか** — 技術方針、実装状況と残作業、作業順序 |
+| [`docs/setup-unity.md`](./docs/setup-unity.md) | Unity プロジェクトのセットアップ手順 |
 
 このリポジトリは、開発者(あなた)と Claude (AI) が共同作業するための専用環境です。
 This repository is a dedicated workspace for collaboration between the owner and Claude (AI).
@@ -33,7 +40,7 @@ CITAItokens/
 | --- | --- | --- |
 | [`software/`](./software/README.md) | Unity 製ゲーム本体 / Unity-based game | [software/README.md](./software/README.md) |
 | [`hardware/`](./hardware/README.md) | 自作PCB設計(ゲームとは独立) / Custom PCB design (independent of the game) | [hardware/README.md](./hardware/README.md) |
-| [`docs/`](./docs/game-mvp-plan.md) | ゲームMVP実装計画 / Game MVP implementation plan | [docs/game-mvp-plan.md](./docs/game-mvp-plan.md) |
+| [`docs/`](./docs/game-design.md) | ゲームデザインと実装計画 / Game design and implementation plan | [docs/game-design.md](./docs/game-design.md) |
 
 ---
 

@@ -14,6 +14,10 @@ Getting people outside and encouraging exercise and contact with nature. This is
 
 **`hardware/` との関係 / Relationship to `hardware/`**: 本ゲームと `hardware/` の自作PCB(「機械に感情を与えるステッカー」)は**現時点では無関係な別プロジェクト**。連携仕様は策定しない。
 
+**ゲームデザイン / Game design**: 何を作るか(進行、屋外要素、アート要件、安全・プライバシー)は [`game-design.md`](./game-design.md) にまとめている。この文書は**どう作るか**を扱う。
+
+What to build — progression, outdoor mechanics, art requirements, safety and privacy — is in [`game-design.md`](./game-design.md). This document covers **how** to build it.
+
 ---
 
 ## 2. 技術方針 / Technical Decisions
@@ -38,12 +42,12 @@ The approach is replaced in stages:
 | 段階 / Stage | 生成方式 / Method | 状態 / Status |
 | --- | --- | --- |
 | 第一テスト / First test | **写真のバイト列から決定的に導出**(`AI/MockCardGenerator`) | 実装済み / Implemented |
-| 完成版 / Final | **オンデバイスの機械学習モデル**(Unity Sentis + ONNX を想定) | 未着手 / Not started |
+| 完成版 / Final | **写真の見た目から導出**(方式は 🔶 未決定 — 下記 8 参照) | 未着手 / Not started |
 
 - 第一テストは「ランダム」で十分だが、実装は**写真のバイト列のハッシュから決定的に**ステータスを導出している。同じ写真からは必ず同じカードが出るため、1枚の写真を撮り直して当たりを引くまで繰り返す抜け道が塞がれる。屋外に出ること自体が目的のゲームなので、この性質は残す価値がある。写真が違えば結果は十分にばらけるため、体感は「ランダム」と変わらない。
   The first test only needs randomness, but the implementation derives stats **deterministically from a hash of the photo bytes**. The same photo always yields the same card, which closes the loophole of re-submitting one photo until a good roll appears. Since going outside is the point of the game, that property is worth keeping — and different photos still produce visibly different cards, so it feels random in play.
-- 完成版のオンデバイスモデルは、枝の太さ・質感・分岐の複雑さといった視覚的特徴からステータスを導出することを狙う。通信不要になるため、電波の弱い屋外という主な利用シーンとも噛み合う。
-  The final on-device model aims to derive stats from visual features such as thickness, texture, and branching. Running locally also suits the main use case of weak signal outdoors.
+- 完成版は、枝の太さ・質感・色といった視覚的特徴からステータスを導出することを狙う。機械学習モデルを使うか、学習なしの画像解析で済ませるかは未決定(**8 で3案を比較。推奨は学習なしの案**)。いずれも端末内で完結するため、電波の弱い屋外という主な利用シーンと噛み合う。
+  The final version aims to derive stats from visual features such as thickness, texture, and colour. Whether that uses an ML model or plain image analysis is undecided — **§8 compares three options and recommends the no-training one**. Either way it runs on-device, which suits the weak-signal outdoor use case.
 - **カード画像は撮影した写真そのものを使う。イラストや画像はAI生成せず、必要なものは人力で用意する。**
   Cards use the captured photo itself. Illustrations and images are **not** AI-generated; anything needed is produced by hand.
 - 生成方式は `ICardGenerator` インターフェース越しに呼ばれており、実装を差し替えても撮影・コレクション・バトルの各層は変更不要。
@@ -70,6 +74,7 @@ The MVP needs **no backend** — on-device generation requires neither network n
 Card
 ├── id                : string (GUID)
 ├── name              : string   (生成 / generated)
+├── weaponGenre       : enum     🔶 未実装 / not yet implemented — game-design.md 4.0
 ├── element           : enum { Wood, Water, Earth }
 ├── rarity            : enum { Common, Uncommon, Rare, Epic }
 ├── stats             : { hp, attack, defense, speed : int }
@@ -186,3 +191,166 @@ The whole loop must run on a real device with **no network at all**. The on-devi
 - **Phase 2**: カードを保存 → アプリを再起動 → コレクションに残っていることを確認。`Card` の非公開フィールドがJSONを往復できるかの確認も兼ねる(ここが壊れると無音で空のカードが読み込まれる)。
 - **Phase 3**: 既知のステータス組み合わせを使い、属性相性(有利/不利/同属性)とダメージ計算が仕様通りかを `Tools/CITAItokens/Run Battle Self-Test` と手動ケースで確認。
 - **最終**: 機内モードのまま「MVP完了の定義」の一連の流れを実機で通しプレイし、通信に依存していないことを確認する。
+
+---
+
+## 6. 現在の実装状況 / Current Implementation Status
+
+**⚠️ このリポジトリのコードは一度もコンパイルされていない。** Unity が無い環境で書かれているため、初回に Unity で開いた時点が最初のコンパイル検証になる。エラーが出るのは想定内。
+
+**⚠️ None of this code has ever been compiled** — it was written in an environment without Unity. The first time you open the project in Unity *is* the first compile check; errors there are expected.
+
+| 層 / Layer | ファイル / Files | 状態 / Status |
+| --- | --- | --- |
+| 共有契約 | `Card/` (Card, StatBlock, ElementType, Rarity, TypeAdvantage), `Data/ICardRepository`, `Data/ICaptureHistory`, `AI/ICardGenerator`, `Capture/IPhotoCapture` | ✅ 完了 |
+| データ・永続化 | `Data/LocalCardRepository`, `ThumbnailStore`, `PlayerPrefsCaptureHistory` | ✅ 完了 |
+| 設定・合成ルート | `Core/AppConfig`, `GameContext`, `ScreenRouter`, `ScreenBase`, `ScreenId`, `GameBootstrap` | ✅ 完了 |
+| 撮影 | `Capture/WebCamPhotoCapture`, `CaptureValidator`, `LocationProbe` | ✅ 完了 |
+| カード生成 | `AI/MockCardGenerator`(ローカル生成), `CardProxyClient` + `CardProxyResponse`(参考実装) | ✅ 完了 |
+| バトル | `Battle/BattleManager`, `DamageCalculator`, `BattleCombatant`, `BattleRoundResult`, `CpuDecks` | ✅ 完了 |
+| UI | `UI/UiFactory`, `CardTextFormatter`, `TitleScreen`, `CaptureScreen`, `CardResultScreen`, `CollectionScreen`, `BattleResultPayload` | ⚠️ 一部完了 |
+| UI(未着手) | `UI/BattleScreen`, `UI/ResultScreen` | ❌ **未作成** |
+| Editor ツール | `Editor/SceneBuilder`, `Editor/BattleSelfTest` | ✅ 完了 |
+| Unity プロジェクト本体 | `ProjectSettings/`, `Packages/` | ❌ 未作成(人力で作成: `setup-unity.md`) |
+| 参考実装のプロキシ | `services/card-proxy/` | ✅ 動作確認済み(MVP対象外) |
+
+### 残作業 / Remaining Work
+
+**コンパイルを通すために必須 / Required to compile:**
+1. `UI/BattleScreen.cs` と `UI/ResultScreen.cs` の作成。**この2つが無いと `GameBootstrap` はコンパイルできない**(6画面すべてを参照している)。
+2. Unity プロジェクトの作成と `Newtonsoft.Json` の導入(`setup-unity.md` 手順1〜2)。
+
+**動くようにするために必須 / Required to run:**
+3. `Tools/CITAItokens/Create Main Scene` の実行。
+4. 初回コンパイルで出るエラーの修正。各エージェントが「自信がない」と申告したAPIが候補(下記)。
+
+**既知の課題 / Known issues:**
+5. **撮影画像の向き補正が未実装。** 端末を縦持ちすると `WebCamTexture` は横向きバッファを返すことが多く、保存されるJPEGが横倒しになる可能性が高い。**実機で最初に出る不具合の最有力候補。**
+6. **`captures/` の古い画像を削除していない。** 長期プレイで容量を食う。サムネイルは別途保存しているので、生成後に元画像を消すか、一定数で古いものから削除する。
+7. **セーブデータにスキーマバージョンが無い**(下記 7 参照)。
+8. `Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf")` — Unity のバージョンによって組み込みフォント名が異なる。`Arial.ttf` へのフォールバックを入れてあるが、両方失敗すると文字が出ない。
+9. Android の `Active Input Handling` が「Input System Package (New)」のみだと `StandaloneInputModule` が機能せず、**ボタンが一切反応しない**。
+10. シーンにカメラが無い。オーバーレイUIは描画されるが Game ビューに警告が出る。
+
+---
+
+## 7. セーブデータのスキーマバージョン / Save Schema Versioning
+
+**現状は未対応。** `collection.json` は `List<Card>` をそのまま保存しており、バージョン番号を持たない。
+
+`Card` に項目を足す・意味を変える改修が入った時点で、既存のセーブデータが読めなくなるか、無音で不正な値が入る。**プレイヤーが屋外を歩いて集めたカードを失う**ため、これは軽い問題ではない。
+
+**対応方針**(実装前に入れておくのが安い):
+
+```
+{
+  "schemaVersion": 1,
+  "cards": [ ... ]
+}
+```
+
+- 読み込み時に `schemaVersion` を見て、必要なら移行処理を通す。
+- 未知の(より新しい)バージョンを読んだ場合は、**上書き保存せず**エラーを出す。古いアプリで新しいセーブを壊さないため。
+- 破損時は既存実装どおり `collection.corrupt-<timestamp>.json` に退避して空から始める(既に実装済み)。
+
+⚠️ **これは `LocalCardRepository` の変更を要するため、他の実装より先に入れるべき。** 後から入れると、既にプレイテストで溜めたデータの移行が必要になる。
+
+---
+
+## 8. オンデバイスモデル / On-Device Model (Phase 6)
+
+完成版の生成方式。**MVP の完了条件には含めない。**
+
+**🔶 実装方針は未決定。** 3案あり、工数が極端に違う:
+
+| 案 / Option | 内容 | 工数 | 学習データ |
+| --- | --- | --- | --- |
+| **A. 学習なしの画像解析**(推奨) | 平均色・色相分布・エッジ量・明暗差などを自前で計算し、ステータスに写像する | 小 | 不要 |
+| B. 既存の学習済みモデル流用 | 一般物体認識の公開モデル(MobileNet 等)を ONNX で組み込み、分類結果をステータスに写像 | 中 | 不要 |
+| C. 自前で学習 | 写真を集めてラベル付けし、モデルを学習させる | 大 | 数百〜数千枚の収集とアノテーションが必要 |
+
+**推奨は A。** 理由: 学習データの収集が不要で、「写真の見た目が結果に反映される」という体験上の要件を満たせる。属性を色から決める(`game-design.md` 4.2)のと同じ延長線上にあり、Unity Sentis も ONNX も要らない。B は「枝かどうか」の判定には使えるが、太さや質感からステータスを導く用途には粒度が合わない。C は本質的だが、このプロジェクトの規模に対して重い。
+
+Recommended: **option A**. It needs no training data, satisfies the experiential requirement that the photo's appearance drives the result, sits on the same path as deriving the element from colour, and requires neither Sentis nor ONNX. B suits "is this a branch?" but not deriving thickness or texture. C is the most faithful but disproportionately heavy for this project.
+
+- どの案でも `ICardGenerator` の実装を差し替えるだけで済む。撮影・コレクション・バトルの各層は変更不要。
+- 🔶 A を選ぶ場合、Phase 6 は Phase 5 と並行できる(独立した実装のため)。
+
+---
+
+## 9. 非機能要件 / Non-Functional Requirements
+
+| 項目 / Item | 目標 / Target | 備考 / Notes |
+| --- | --- | --- |
+| カード生成時間 | 3秒以内 | 屋外で立ち止まる時間を短くする。通信しないので達成は容易 |
+| 起動時間 | 5秒以内 | `GameBootstrap` が全UIを実行時に構築するため、画面数が増えると伸びる。増えたら遅延構築に変える |
+| ストレージ | 1000枚で 200MB 以内 | サムネイル1枚 50-150KB。元画像の削除(残作業6)が前提 |
+| フレームレート | 30fps 固定 | `Application.targetFrameRate = 30`(実装済み)。カードゲームに60fpsは不要で、屋外=充電できない環境では電池を優先 |
+| 対応OS | Android 7.0 (API 24) 以上 | 🔶 暫定。カメラと位置情報が使えれば足りる |
+| オフライン動作 | 完全にオフラインで全機能が動く | 機内モードでの通しプレイを検証項目にする |
+
+---
+
+## 10. テスト計画 / Test Plan
+
+自動テストは `.asmdef` の制約で導入していない(2.8 参照)。代わりに以下で担保する。
+
+| 対象 / Target | 方法 / Method |
+| --- | --- |
+| バトルの計算 | `Tools/CITAItokens/Run Battle Self-Test`(実装済み、約70項目) |
+| 永続化の往復 | 保存 → アプリ再起動 → 読み込みを手動で確認。**`Card` の非公開フィールドが Newtonsoft で往復できるかが要点**(壊れると無音で空のカードになる) |
+| 撮影フローの分岐 | 許可拒否 / カメラ無し / 鮮度切れ / 移動不足 / 生成失敗 の各状態を意図的に作り、メッセージと復帰手段を確認 |
+| 決定的生成 | 同じ写真から同じカードが出ること、違う写真では十分ばらけることの両方 |
+| オフライン | 機内モードで通しプレイ |
+| 実機での見え方 | 直射日光下での可読性、片手操作、日本語が豆腐にならないこと |
+
+🔶 将来 `.asmdef` を導入して Unity Test Framework に移行する選択肢は残す。その場合、プラグインを使わない現在の構成なら副作用は小さい。
+
+---
+
+## 11. リリースに向けて / Toward Release
+
+MVP の完了条件には含めないが、着手前に把握しておく項目。
+
+- **プライバシーポリシーの掲示が必須。** カメラと位置情報のパーミッションを要求するため、Google Play / App Store 双方で要求される。「端末外に送信しない」と明記できるのは強い(`game-design.md` 8.2)。
+- **ストアのデータ収集申告**: 写真・位置情報を「収集しない(端末内処理のみ)」と申告する。実装がその通りであることが前提。
+- 🔶 **年齢レーティング**: 想定ユーザーに子どもが含まれるかで要件が変わる。位置情報を扱う点は説明を要する。**要確認**。
+- **アプリアイコンとストア掲載素材**は人力で用意する(`game-design.md` 7)。
+- iOS は Apple Developer Program の登録が必要。Android 優先の理由の一つ。
+
+---
+
+## 12. 作業順序と依存関係 / Work Order and Dependencies
+
+実装を再開する際の順序。**依存関係で決まっている部分と、選択の余地がある部分を分けて書く。**
+
+```
+[必須・順序固定]
+  1. セーブスキーマバージョン導入 (LocalCardRepository)   ← 後から入れると移行が必要
+  2. 武器ジャンルの導入 (Card に WeaponGenre 追加、生成側で補正)
+                                                          ← 1 の後。Card の形が変わるため
+  3. UI/BattleScreen + UI/ResultScreen 作成               ← 無いとコンパイル不可
+  4. Unity プロジェクト作成 + Newtonsoft 導入 (人力)
+  5. Create Main Scene → 初回コンパイル → エラー修正      ← ここが最初の実質的な検証
+  6. Editor 上で通しプレイ (PCのWebカメラ、モック生成)
+
+[必須・5以降ならいつでも]
+  7. 撮影画像の向き補正                                    ← 実機で最初に出る不具合の本命
+  8. captures/ の古い画像の削除
+  9. Android 実機ビルド → 屋外で実際に撮影
+
+[選択・上記が通ってから]
+ 10. 屋外要素の有効化 (移動距離チェック、1日の上限)        ← game-design.md 6
+ 11. アート素材の差し込み (ジャンル/属性アイコン等)         ← game-design.md 7
+ 12. 図鑑 (ジャンル × 属性 18枠)                           ← game-design.md 3
+ 13. バランス調整 (ジャンル/属性の補正値、予算制)          ← ⏸️ 保留中
+ 14. 写真の見た目からジャンルを判別 (Phase 6)              ← 🔶 方針未決定、10-13と並行可
+```
+
+**5 が最大の関門。** コンパイルされたことがないコードなので、ここで一定量のエラーが出る。7 の向き補正も実機でしか判断できない。この2点を通過するまでは、その先の作業(アート、バランス、図鑑)に着手しても手戻りする可能性がある。
+
+**Step 5 is the real gate.** None of this code has been compiled, so expect a batch of errors there. Step 7 can only be judged on a real device. Until both are through, work further down the list risks being redone.
+
+**2 を早い段階に置いた理由**: 武器ジャンルは `Card` の形を変える。カードは永続化されるため、プレイテストでデータが溜まった後に追加すると移行処理が必要になる。図鑑もジャンルを軸にするため、後続の作業が依存している。
+
+**Why step 2 is early**: the weapon genre changes the shape of `Card`. Cards are persisted, so adding it after playtest data accumulates would require a migration — and the collection screen depends on it as an axis.
