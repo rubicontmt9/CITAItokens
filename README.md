@@ -5,9 +5,9 @@
 
 ## 🌳 ゲームについて / About the Game
 
-屋外で木の枝などの自然物を撮影すると、AIが写真を解析してステータスを振った「カード」を生成し、そのカードで対戦するスマホゲームです。人を外に出し、運動や自然との触れ合いのきっかけを作ることを目的にしています。
+屋外で木の枝などの自然物を撮影すると、その写真からステータスを振った「カード」が生成され、そのカードで対戦するスマホゲームです。人を外に出し、運動や自然との触れ合いのきっかけを作ることを目的にしています。生成処理は端末内で完結させ、クラウドには繋ぎません。
 
-A smartphone game where you photograph a tree branch (or other natural object) outdoors, an AI analyzes the photo and generates a battle card with stats, and you battle with that card. The goal is to get people outside, moving, and in contact with nature.
+A smartphone game where you photograph a tree branch (or other natural object) outdoors, the photo produces a battle card with stats, and you battle with that card. The goal is to get people outside, moving, and in contact with nature. Generation runs on-device — nothing is sent to the cloud.
 
 実装計画の詳細は [`docs/game-mvp-plan.md`](./docs/game-mvp-plan.md) を参照してください。
 See [`docs/game-mvp-plan.md`](./docs/game-mvp-plan.md) for the detailed implementation plan.

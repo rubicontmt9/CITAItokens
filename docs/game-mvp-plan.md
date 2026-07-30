@@ -2,9 +2,9 @@
 
 ## 1. ゲーム概要 / Game Concept
 
-屋外で木の枝などの自然物を撮影すると、AIが写真を解析してステータスを振った「カード」を生成し、そのカードで対戦するスマホゲーム。バーコードバトラー系のゲームループを、バーコードの代わりに「自然物の写真」で回す。
+屋外で木の枝などの自然物を撮影すると、その写真からステータスを振った「カード」が生成され、そのカードで対戦するスマホゲーム。バーコードバトラー系のゲームループを、バーコードの代わりに「自然物の写真」で回す。生成処理はすべて端末内で完結させ、クラウドAIは使わない。
 
-A smartphone game in the vein of Barcode Battler: photograph a tree branch or other natural object outdoors, an AI analyzes the photo and generates a card with battle stats, then battle with that card. The barcode is replaced by a photo of nature.
+A smartphone game in the vein of Barcode Battler: photograph a tree branch or other natural object outdoors, the photo produces a card with battle stats, and you battle with that card. The barcode is replaced by a photo of nature. All generation runs on-device — no cloud AI.
 
 **目的 / Purpose**: 人を外に出し、運動や自然との触れ合いのきっかけを作ること。これは世界観ではなく設計上の制約であり、「本当に屋外で今撮った写真」であることを担保する仕組みを設計に含める。
 
@@ -24,37 +24,56 @@ Getting people outside and encouraging exercise and contact with nature. This is
 - Unity **2022 LTS** を推奨(安定・情報量が多い)。最新の 6000.x 系は避ける。
 - 対象プラットフォームは **Android を優先**(署名・審査の手間がなく実機での反復が速い)。iOS は後追い。
 - 撮影は Unity 標準の **`WebCamTexture`** で実装する。サードパーティのネイティブカメラプラグインは使わない(後述の「実装時の設計変更」参照)。いずれの方式でもギャラリーから既存写真を取り込む経路は存在せず、屋外担保の効果は同じ。
-- JSONは `Newtonsoft.Json`(Unity Package Manager 経由)を使用。AIレスポンスの柔軟なパースには `JsonUtility` では不足。
+- JSONは `Newtonsoft.Json`(Unity Package Manager 経由)を使用。`Card` は非公開フィールド + 読み取り専用プロパティ構成のため、`JsonUtility` ではセーブデータを往復できない。
 - 必要パーミッション: `CAMERA`, `INTERNET`(GPSチェックを入れる場合は `ACCESS_FINE_LOCATION`)。
 
-### 2.2 AIによるステータス生成 / AI Stat Generation
+### 2.2 ステータス生成 / Stat Generation
 
-**マルチモーダルLLM(vision対応モデル)への画像+プロンプト送信**を採用する。
+**すべてオンデバイスで完結させる。クラウドAIは使わない。**
+All generation runs on-device. No cloud AI is used.
 
-- 採用理由: オンデバイスの画像処理ヒューリスティック(エッジ検出・色ヒストグラム等)を自作するより実装コストが低く、カード名やフレーバーテキストも同時に得られる。
-- プロンプトでは「枝の太さ・質感・色・分岐の複雑さ」等の視覚的特徴を根拠として記述させ、**固定スキーマのJSONのみ**を返させる。
-- 返却された数値は必ずクランプ/バリデーションする。壊れたJSONや異常値は **1回リトライ → デフォルト値でフォールバック** とし、プレイヤーが行き止まりにならないようにする。
-- **通信環境への配慮**: 主な利用シーンが電波の弱い屋外である前提で、撮影自体は完全にオフラインで完結させる。カード生成(通信)は「生成中…」状態とリトライを用意する。MVPでは「カード生成には通信が必要」と割り切り、UIで明示する。
+段階的に置き換える方針:
+The approach is replaced in stages:
+
+| 段階 / Stage | 生成方式 / Method | 状態 / Status |
+| --- | --- | --- |
+| 第一テスト / First test | **写真のバイト列から決定的に導出**(`AI/MockCardGenerator`) | 実装済み / Implemented |
+| 完成版 / Final | **オンデバイスの機械学習モデル**(Unity Sentis + ONNX を想定) | 未着手 / Not started |
+
+- 第一テストは「ランダム」で十分だが、実装は**写真のバイト列のハッシュから決定的に**ステータスを導出している。同じ写真からは必ず同じカードが出るため、1枚の写真を撮り直して当たりを引くまで繰り返す抜け道が塞がれる。屋外に出ること自体が目的のゲームなので、この性質は残す価値がある。写真が違えば結果は十分にばらけるため、体感は「ランダム」と変わらない。
+  The first test only needs randomness, but the implementation derives stats **deterministically from a hash of the photo bytes**. The same photo always yields the same card, which closes the loophole of re-submitting one photo until a good roll appears. Since going outside is the point of the game, that property is worth keeping — and different photos still produce visibly different cards, so it feels random in play.
+- 完成版のオンデバイスモデルは、枝の太さ・質感・分岐の複雑さといった視覚的特徴からステータスを導出することを狙う。通信不要になるため、電波の弱い屋外という主な利用シーンとも噛み合う。
+  The final on-device model aims to derive stats from visual features such as thickness, texture, and branching. Running locally also suits the main use case of weak signal outdoors.
+- **カード画像は撮影した写真そのものを使う。イラストや画像はAI生成せず、必要なものは人力で用意する。**
+  Cards use the captured photo itself. Illustrations and images are **not** AI-generated; anything needed is produced by hand.
+- 生成方式は `ICardGenerator` インターフェース越しに呼ばれており、実装を差し替えても撮影・コレクション・バトルの各層は変更不要。
+  Generation is invoked through the `ICardGenerator` interface, so swapping implementations requires no changes in the capture, collection, or battle layers.
 
 ### 2.3 バックエンド / Backend
 
-**最小限のプロキシサービスを1つ挟む**(クライアントからAI APIを直接叩かない)。
+**MVPにバックエンドは不要。** オンデバイス生成のみなので、通信もサーバーも要らない。
 
-- 理由: クライアント直叩きだとAPIキーがアプリバイナリに埋め込まれ、逆コンパイルで抽出できてしまう。屋外で実機を持ち歩いてテストする前提の本ゲームでは、この露出は看過できない。
-- 構成: サーバーレス関数1つ(Cloudflare Workers など)。画像を受け取り → AI APIへ転送(APIキーはサーバー側のみ) → レスポンスを再バリデーション → クライアントへカードJSONを返す。
-- MVPでは認証・レート制限は省略可。本番化の際に、ユーザー認証、アプリ由来リクエストの検証、レート制限、画像サイズ制限、ログ/監視を追加する。
+The MVP needs **no backend** — on-device generation requires neither network nor server.
+
+`services/card-proxy/` にクラウドAI経由の生成を行うプロキシ実装が残っているが、これは**MVPの経路ではない参考実装**である。クラウドAIを検討していた段階で作成し、動作確認まで済んでいるため保管してある。使う場合は `AppConfig` の `cardProxyUrl` を設定し `useMockCardGenerator` を切ると有効になる。既定は無効。
+
+`services/card-proxy/` still contains a proxy that generates cards via a cloud AI. It is a **reference implementation, not part of the MVP path** — built and smoke-tested while cloud AI was under consideration, and kept for reference. To use it, set `cardProxyUrl` in `AppConfig` and turn off `useMockCardGenerator`; it is disabled by default.
+
+- クラウド経路を使う場合でも、クライアントから直接AI APIを叩かせない設計は維持する。屋外で実機を持ち歩く前提のため、APIキーをアプリバイナリに埋め込むと抽出される。
+  Even on the cloud path, the client must never call the AI API directly: the app is carried outdoors on real devices, and a key embedded in the binary can be extracted.
 - **APIキーは絶対にリポジトリにコミットしない。**
+  **Never commit API keys to this repository.**
 
 ### 2.4 データモデルと永続化 / Data Model & Persistence
 
 ```
 Card
 ├── id                : string (GUID)
-├── name              : string   (AI生成)
+├── name              : string   (生成 / generated)
 ├── element           : enum { Wood, Water, Earth }
 ├── rarity            : enum { Common, Uncommon, Rare, Epic }
 ├── stats             : { hp, attack, defense, speed : int }
-├── flavorText        : string   (AI生成)
+├── flavorText        : string   (生成 / generated)
 ├── imagePath         : string   (撮影写真のサムネイルへの相対パス)
 ├── captureTimestamp  : DateTime
 ├── captureLocation   : (lat, lon)  ※任意 / optional
@@ -87,7 +106,7 @@ Card
 ```
 software/Assets/Scripts/
 ├── Capture/  # WebCamTextureによる撮影、位置情報取得、鮮度/移動距離の検証
-├── AI/       # プロキシへのAPIクライアント、レスポンスのパース/バリデーション、モック生成
+├── AI/       # カード生成(ローカル生成 / 参考実装のプロキシクライアント / 検証・クランプ)
 ├── Card/     # Cardモデル、属性相性テーブル
 ├── Data/     # ローカルJSON永続化、サムネイル保存、直近撮影の記録
 ├── Battle/   # BattleManager、ダメージ計算、CPUデッキ定義
@@ -128,40 +147,42 @@ Unity Test Framework を使うには `.asmdef` が必要だが、`.asmdef` を�
 
 Using the Unity Test Framework requires an `.asmdef`, and introducing one hides `Assembly-CSharp` code from that assembly. The MVP instead ships a **self-test runnable from `Tools/CITAItokens/Run Battle Self-Test`**, covering the damage formula, type advantage, turn order, and HP clamping.
 
-#### オフライン用モック生成の追加 / Added an offline mock generator
-
-プロキシをデプロイする前でもループ全体を遊べるように、写真のバイト列から決定的にステータスを導出する `AI/MockCardGenerator` を追加した。`AppConfig.useMockCardGenerator` で切り替える。
-
-`AI/MockCardGenerator` derives stats deterministically from the photo bytes so the full loop is playable before the proxy is deployed. Toggled by `AppConfig.useMockCardGenerator`.
-
 ---
 
 ## 3. フェーズ計画 / Phased Milestones
 
 | フェーズ / Phase | 内容 / Deliverables | 規模 / Size |
 | --- | --- | --- |
-| **Phase 0 — 雛形構築** | Unity 2022 LTS プロジェクトを `software/` に作成。`.gitignore` 確認。NativeCamera / Newtonsoft.Json 導入。6シーンをプレースホルダのボタンで繋ぎ、遷移だけ通る状態にする。Android実機ビルド確認。 | M |
-| **Phase 1 — 撮影・カード生成** ⚠️最大リスク | カメラ連携、最小プロキシのデプロイ、AIクライアント、`CardFactory`、CardResult画面。外部API依存とJSON信頼性が最大の不確実性のため、バトルより先に単独で動作確認する。 | L |
-| **Phase 2 — コレクション・永続化** | `CardRepository` のローカル保存/読込、Collection画面、CardResultからの「コレクションに追加」。 | S |
+| **Phase 0 — 雛形構築** | Unity 2022 LTS プロジェクトを `software/` に作成。`.gitignore` 確認。`Newtonsoft.Json` 導入。シーン生成メニューを実行し、画面遷移だけ通る状態にする。Android実機ビルド確認。 | M |
+| **Phase 1 — 撮影・カード生成** | `WebCamTexture` による撮影、`MockCardGenerator` によるローカル生成、CardResult画面。通信もサーバーも不要なため、当初想定していた外部API依存のリスクは無くなった。 | M |
+| **Phase 2 — コレクション・永続化** | `CardRepository` のローカル保存/読込、Collection画面、CardResultからのコレクション反映。 | S |
 | **Phase 3 — バトルシステム** | `BattleManager`、ダメージ計算、属性相性テーブル、CPU固定デッキ、Battle/Result画面UI。 | M |
-| **Phase 4 — 屋外担保の仕上げ** | カメラ経路の検証(構造的にはPhase 1で満たされる想定)、EXIF/GPSチェックの追加と却下時のメッセージ。 | S |
-| **Phase 5 — 仕上げ・プレイテスト** | カード公開演出、被弾フィードバック、通信失敗時のリトライUX、ダメージ倍率の実プレイ調整、タイトル画面の説明、アプリアイコン。 | M |
+| **Phase 4 — 屋外担保の仕上げ** | カメラ経路の検証(構造的にはPhase 1で満たされる想定)、鮮度/移動距離チェックの追加と却下時のメッセージ。 | S |
+| **Phase 5 — 仕上げ・プレイテスト** | カード公開演出、被弾フィードバック、ダメージ倍率の実プレイ調整、タイトル画面の説明、手描きのUI素材・アイコン。 | M |
+| **Phase 6 — オンデバイスモデル**(MVP後) | 写真の視覚的特徴からステータスを導出するモデルを Unity Sentis + ONNX で組み込み、`ICardGenerator` の実装として差し替える。 | L |
 
-Phase 1 をバトルより先に置くのは、AIパイプラインの信頼性(プロンプト品質、JSONパースの堅牢性、プロキシのレイテンシ)が最大の未知であり、バトルはCardモデルが固まれば機械的に実装できる低リスク領域であるため。
+Phase 1〜3 の順序は当初どおり。生成がローカル完結になったことで Phase 1 の不確実性は下がったが、`Card` モデルが固まらないとバトル・コレクションが書けないため、依存関係上この順序が変わらない。
+
+The Phase 1–3 order is unchanged. Local generation lowers Phase 1's risk, but battle and collection still depend on the `Card` model being settled, so the ordering holds.
 
 ---
 
 ## 4. MVP完了の定義 / Definition of Done
 
-以下を実機で(モックなし・実際のAI通信込みで)通しプレイできること:
+以下を実機で通しプレイできること:
 
-タイトル → 外に出る → 枝を撮影 → AI解析待ち → 生成されたカードを確認 → コレクションに追加 → CPU戦 → 勝敗決定 → 結果画面 → タイトルに戻る
+タイトル → 外に出る → 枝を撮影 → カード生成 → 生成されたカードを確認 → コレクションに追加 → CPU戦 → 勝敗決定 → 結果画面 → タイトルに戻る
+
+通信は一切不要。オンデバイスモデル(Phase 6)はMVPの完了条件に含めない。
+
+The whole loop must run on a real device with **no network at all**. The on-device model (Phase 6) is not part of the MVP's definition of done.
 
 ---
 
 ## 5. 検証方法 / Verification
 
 - **Phase 0**: Android実機にビルドをインストールし、Title → Capture → … → Result までボタンで一周できることを確認。
-- **Phase 1**: 実際に屋外で枝を撮影し、プロキシ経由でカードJSONが返ることを確認。加えて、意図的に不正なJSON/範囲外の数値を返すテストを行い、クランプとフォールバックが機能することを確認。
-- **Phase 3**: 既知のステータス組み合わせを使い、属性相性(有利/不利/同属性)とダメージ計算が仕様通りかを手動テストケースで確認。
-- **最終**: 上記「MVP完了の定義」の一連の流れを実機で通しプレイ。オフライン→通信復帰時のリトライ挙動も確認する。
+- **Phase 1**: 実際に屋外で枝を撮影し、カードが生成されることを確認。同じ写真から同じカードが出ること、違う写真では十分にばらけることの両方を確認する(決定的生成の意図どおりか)。
+- **Phase 2**: カードを保存 → アプリを再起動 → コレクションに残っていることを確認。`Card` の非公開フィールドがJSONを往復できるかの確認も兼ねる(ここが壊れると無音で空のカードが読み込まれる)。
+- **Phase 3**: 既知のステータス組み合わせを使い、属性相性(有利/不利/同属性)とダメージ計算が仕様通りかを `Tools/CITAItokens/Run Battle Self-Test` と手動ケースで確認。
+- **最終**: 機内モードのまま「MVP完了の定義」の一連の流れを実機で通しプレイし、通信に依存していないことを確認する。
