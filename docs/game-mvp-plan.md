@@ -23,7 +23,7 @@ Getting people outside and encouraging exercise and contact with nature. This is
 - **Unity (C#)** — 既存の `software/README.md` の方針通り。
 - Unity **2022 LTS** を推奨(安定・情報量が多い)。最新の 6000.x 系は避ける。
 - 対象プラットフォームは **Android を優先**(署名・審査の手間がなく実機での反復が速い)。iOS は後追い。
-- 撮影は `WebCamTexture` による自作プレビューではなく、**OSのカメラアプリを呼び出すネイティブカメラ連携**を採用(例: `NativeCamera` パッケージ / MIT)。ギャラリー選択の経路がそもそも存在しない構造になり、後述の屋外担保にそのまま効く。
+- 撮影は Unity 標準の **`WebCamTexture`** で実装する。サードパーティのネイティブカメラプラグインは使わない(後述の「実装時の設計変更」参照)。いずれの方式でもギャラリーから既存写真を取り込む経路は存在せず、屋外担保の効果は同じ。
 - JSONは `Newtonsoft.Json`(Unity Package Manager 経由)を使用。AIレスポンスの柔軟なパースには `JsonUtility` では不足。
 - 必要パーミッション: `CAMERA`, `INTERNET`(GPSチェックを入れる場合は `ACCESS_FINE_LOCATION`)。
 
@@ -65,7 +65,7 @@ Card
 
 ### 2.5 屋外担保(アンチチート) / Outdoor Enforcement
 
-- **主策**: ネイティブカメラ連携により、ギャラリーから既存写真を取り込む経路がアプリ内に存在しない。設定で無効化できる「ルール」ではなく構造的な担保であり、追加コストがほぼゼロ。
+- **主策**: 撮影経路が `WebCamTexture` のみで、ギャラリーから既存写真を取り込むコードパスがアプリ内に存在しない。設定で無効化できる「ルール」ではなく構造的な担保であり、追加コストがほぼゼロ。
 - **副策(余裕があれば)**: EXIFのタイムスタンプが直近数分以内であることを確認。位置情報の許可があれば、前回撮影地点から一定距離(20〜50m目安)離れているかを確認する。「移動して撮る」を後押しする。
 - **MVP対象外**: サーバー側の画像鑑識、ライブネス検知、ハッシュのタイムスタンプ証明など。単独プレイでリーダーボードも経済もないMVPでは費用対効果が合わない。
 
@@ -86,18 +86,53 @@ Card
 
 ```
 software/Assets/Scripts/
-├── Camera/   # ネイティブカメラ連携、撮影フロー、EXIF/時刻チェック
-├── AI/       # プロキシへのAPIクライアント、レスポンスのパース/バリデーション
-├── Card/     # Cardモデル、CardFactory(AI結果→Card変換)、属性相性テーブル
-├── Data/     # CardRepository(ローカルJSON永続化)、直近撮影地点/時刻の保持
+├── Capture/  # WebCamTextureによる撮影、位置情報取得、鮮度/移動距離の検証
+├── AI/       # プロキシへのAPIクライアント、レスポンスのパース/バリデーション、モック生成
+├── Card/     # Cardモデル、属性相性テーブル
+├── Data/     # ローカルJSON永続化、サムネイル保存、直近撮影の記録
 ├── Battle/   # BattleManager、ダメージ計算、CPUデッキ定義
-├── UI/       # 各シーンのUIコントローラ、共通ウィジェット(カード表示、HPバー)
-└── Core/     # シーン遷移、設定(プロキシURL等)
+├── UI/       # 各画面のコントローラ、共通ウィジェット(カード表示、HPバー)
+└── Core/     # 画面遷移(ScreenRouter)、設定(AppConfig)、合成ルート(GameContext)
 ```
 
-**シーン構成 / Scenes**: `Title → Capture → CardResult → Collection → Battle → Result`
+`Camera/` ではなく `Capture/` としているのは、`CitaiTokens.Camera` という名前空間が `UnityEngine.Camera` と衝突して曖昧参照を招くため。
+The folder is `Capture/` rather than `Camera/` because a `CitaiTokens.Camera` namespace would collide with `UnityEngine.Camera` and create ambiguous references.
 
-シーン遷移は `Core` のシーン遷移ヘルパーに集約し、各シーンから `SceneManager.LoadScene` を直接散らばらせない。
+**画面構成 / Screens**: `Title → Capture → CardResult → Collection → Battle → Result`
+
+画面遷移は `Core/ScreenRouter` に集約する。
+
+---
+
+### 2.8 実装時の設計変更 / Deviations Decided During Implementation
+
+計画策定後、実装に着手する段階で以下を変更した。理由も残す。
+
+Decisions changed once implementation started, with the reasons recorded.
+
+#### 6シーン構成 → 1シーン + プログラム生成UI / Six scenes → one scene with programmatic UI
+
+Unityの `.unity` シーンファイルと `.prefab` はYAML形式だが、GUID参照や内部IDの整合が必要で、手書きで確実に生成できる形式ではない。実装をLLMエージェントに分担させる前提では、シーンファイルを生成物にすると壊れやすい。そのため **1つのシーンに全画面のGameObjectを置き、`Core/ScreenRouter` が表示を切り替える**構成にした。1画面1コントローラという分割は計画通りで、論理構造は変わらない。
+
+`.unity` scene files and `.prefab` assets are YAML, but not a format that can be reliably hand-authored (GUID references and internal ids must stay consistent). With implementation split across LLM agents, generated scene files would be fragile. Instead, **all screens are GameObjects in a single scene and `Core/ScreenRouter` toggles visibility.** The one-controller-per-screen split is unchanged.
+
+#### ネイティブカメラプラグイン → Unity標準 `WebCamTexture` / Native camera plugin → built-in `WebCamTexture`
+
+当初はOSのカメラアプリを呼び出すサードパーティプラグインを想定していたが、`WebCamTexture` に変更した。理由: (1) コンパイル検証できない外部APIへの依存を排除できる、(2) Unity Editor上でPCのWebカメラを使えるため、屋外に出ずに机の上でループ全体をテストできる、(3) `WebCamTexture` にもギャラリー取り込み経路はないため、屋外担保の効果は落ちない。
+
+The plan originally assumed a third-party plugin launching the OS camera app; this changed to `WebCamTexture` because (1) it removes a dependency on an API that cannot be compile-verified here, (2) it works in the Editor with a PC webcam, so the whole loop is testable at a desk, and (3) `WebCamTexture` has no gallery path either, so the outdoor guarantee is unaffected.
+
+#### 自動テスト → Editorメニューからの自己診断 / Automated tests → an Editor-menu self-test
+
+Unity Test Framework を使うには `.asmdef` が必要だが、`.asmdef` を導入するとそのアセンブリから `Assembly-CSharp` 側のコードが見えなくなり構成が複雑化する。MVPでは代わりに **`Tools/CITAItokens/Run Battle Self-Test` メニューから実行できる自己診断**を用意し、ダメージ計算・属性相性・行動順・HPクランプを検証する。
+
+Using the Unity Test Framework requires an `.asmdef`, and introducing one hides `Assembly-CSharp` code from that assembly. The MVP instead ships a **self-test runnable from `Tools/CITAItokens/Run Battle Self-Test`**, covering the damage formula, type advantage, turn order, and HP clamping.
+
+#### オフライン用モック生成の追加 / Added an offline mock generator
+
+プロキシをデプロイする前でもループ全体を遊べるように、写真のバイト列から決定的にステータスを導出する `AI/MockCardGenerator` を追加した。`AppConfig.useMockCardGenerator` で切り替える。
+
+`AI/MockCardGenerator` derives stats deterministically from the photo bytes so the full loop is playable before the proxy is deployed. Toggled by `AppConfig.useMockCardGenerator`.
 
 ---
 

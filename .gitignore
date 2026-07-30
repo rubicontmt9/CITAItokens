@@ -25,6 +25,20 @@ software/.vscode/
 software/*/Assets/AssetStoreTools*
 crashlytics-build.properties
 
+# ==== 設定・シークレット / Config & secrets ====
+# APIキーやプロキシURLなど、環境ごとの値はコミットしない
+# Never commit per-environment values such as API keys or proxy URLs
+software/Assets/Resources/AppConfig.asset
+software/Assets/Resources/AppConfig.asset.meta
+.dev.vars
+.env
+.env.local
+
+# ==== Node (services/) ====
+node_modules/
+.wrangler/
+services/**/dist/
+
 # ==== KiCad (hardware/) ====
 hardware/**/*-bak
 hardware/**/*.bak
