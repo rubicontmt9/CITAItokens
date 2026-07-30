@@ -1,7 +1,10 @@
-# hardware/ — 専用ハードウェア設計 / Custom Hardware Design
+# hardware/ — 自作ハードウェア設計 / Custom Hardware Design
 
-ゲーム専用の自作PCB(基板)設計一式を格納します。設計ツールは KiCad を想定しています。
-This directory holds the custom PCB (circuit board) design for the game's dedicated hardware, designed using KiCad.
+自作PCB(基板)設計一式を格納します。設計ツールは KiCad を想定しています。
+This directory holds a custom PCB (circuit board) design, created with KiCad.
+
+> ℹ️ このトラックは `software/` のゲームとは独立した別プロジェクトです。
+> ℹ️ This track is a separate project, independent of the game in `software/`.
 
 ## フォルダ構成 / Layout
 
@@ -24,7 +27,8 @@ hardware/
 4. 使用する KiCad のバージョンが決まったらこの README に明記してください。
    Once the KiCad version in use is decided, note it here.
 
-## ソフトウェア連携 / Software Integration
+## ソフトウェアとの関係 / Relationship to `software/`
 
-ゲーム本体 (`software/`) との通信インターフェース(シリアル通信のピン配置・プロトコルなど)は、仕様が固まり次第このファイルに追記します。
-The communication interface with the game (`software/`) — e.g. serial pinout and protocol — will be documented here once the spec is finalized.
+このハードウェアトラックは、`software/` のゲームとは**独立した別プロジェクト**です。両者を接続する通信プロトコル等の連携は現時点では予定していません。方針が変わった場合はこのファイルを更新します。
+
+This hardware track is an **independent project**, separate from the game in `software/`. No communication protocol or integration between them is currently planned. This file will be updated if that changes.
