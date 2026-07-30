@@ -205,19 +205,30 @@ namespace CitaiTokens.AI
                     "サーバーが混み合っています。少し待ってからもう一度お試しください。", true);
             }
 
-            // 4xx は再試行しても同じ結果になる。422 の説明文はプレイヤーがそのまま読む必要がある。
-            // 4xx would fail identically on retry. The explanation carried by a 422 must reach the player verbatim.
+            // 4xx は再試行しても同じ結果になる。422 の説明文だけはプレイヤー向けの日本語なので
+            // そのまま提示するが、それ以外の 4xx はクライアント側の不具合を示す開発者向け診断
+            // (英語) なので、プレイヤーには出さずログにのみ残す。
+            // 4xx would fail identically on retry. Only the 422 body is player-facing Japanese, so it is
+            // shown verbatim; other 4xx bodies are English developer diagnostics indicating a client-side
+            // bug, so they stay in the log rather than reaching the player.
             if (responseCode >= 400)
             {
-                var serverMessage = ExtractServerError(bodyText);
                 Debug.LogWarning(
                     "[CardProxyClient] リクエストが拒否されました / The request was rejected with "
                     + responseCode + ": " + bodyText);
+
+                if (responseCode == 422)
+                {
+                    var serverMessage = ExtractServerError(bodyText);
+                    return CardGenerationResult.Fail(
+                        string.IsNullOrEmpty(serverMessage)
+                            ? "この写真ではカードを作れませんでした。木の枝や葉、石などの自然物を撮ってみてください。"
+                            : serverMessage,
+                        false);
+                }
+
                 return CardGenerationResult.Fail(
-                    string.IsNullOrEmpty(serverMessage)
-                        ? "この写真ではカードを作れませんでした。木の枝や葉、石などの自然物を撮ってみてください。"
-                        : serverMessage,
-                    false);
+                    "カードを作れませんでした。もう一度撮影してみてください。", false);
             }
 
             if (responseCode >= 200 && responseCode <= 299)
