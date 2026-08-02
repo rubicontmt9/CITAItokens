@@ -17,7 +17,8 @@ The branch you photograph becomes a **weapon**; its **genre** and **element** mo
 | --- | --- |
 | [`docs/game-design.md`](./docs/game-design.md) | **何を作るか** — 体験の核、進行、カード生成の骨格、屋外要素、アート要件、安全・プライバシー |
 | [`docs/game-mvp-plan.md`](./docs/game-mvp-plan.md) | **どう作るか** — 技術方針、実装状況と残作業、作業順序 |
-| [`docs/setup-unity.md`](./docs/setup-unity.md) | Unity プロジェクトのセットアップ手順 |
+| [`docs/setup-unity.md`](./docs/setup-unity.md) | Unity プロジェクトのセットアップ、GitHub との接続 |
+| [`docs/android-testing.md`](./docs/android-testing.md) | Android 実機での検証手順（実機でしか判定できない項目と、その確認方法） |
 
 このリポジトリは、開発者(あなた)と Claude (AI) が共同作業するための専用環境です。
 This repository is a dedicated workspace for collaboration between the owner and Claude (AI).

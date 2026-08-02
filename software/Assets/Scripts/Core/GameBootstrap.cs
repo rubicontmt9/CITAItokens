@@ -68,6 +68,14 @@ namespace CitaiTokens.Core
             // 撮影中に画面が消えるのは困るが、プレイヤーの端末設定を上書きするほどではない。
             // A screen blanking mid-capture is annoying, but not enough to override the player's own setting.
             Screen.sleepTimeout = SleepTimeout.SystemSetting;
+
+            // セーブデータと撮影画像の実際の保存先をログに出す。Android では
+            // persistentDataPath が Player Settings の Write Permission で変わるため、
+            // adb で中身を調べるときに実際のパスが分からないと手探りになる。
+            // Log where saves and captures actually live. On Android the value of persistentDataPath
+            // depends on the Write Permission player setting, so inspecting files over adb is guesswork
+            // without knowing the real path.
+            Debug.Log("[GameBootstrap] persistentDataPath = " + Application.persistentDataPath);
         }
 
         /// <summary>
