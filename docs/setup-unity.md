@@ -101,27 +101,32 @@ Binary assets like PNGs bloat Git history. **Git LFS** is worth considering, but
 
 This repository contains **only the parts Unity does not generate**. `software/Assets/Scripts/` and `software/Assets/Editor/` hold the C# code; `ProjectSettings/`, `Packages/`, `Assets/Scenes/` and `Library/` do not exist yet. The Unity project you create must **overlap the existing folder**, not sit next to it.
 
+> ⚠️ **いきなり `Add project from disk` で `software/` を選ぶと「Unityプロジェクトが無い」と言われます。** Unity Hub はフォルダを **`ProjectSettings/ProjectVersion.txt` の有無**でプロジェクトと判定しますが、このリポジトリには Unity が生成する部分を入れていないため、まだ存在しません。**下記の 1〜3 を先に済ませてから 4 で追加してください。**
+> ⚠️ **Pointing `Add project from disk` at `software/` first will fail with "no Unity project found".** Unity Hub identifies a project by the presence of **`ProjectSettings/ProjectVersion.txt`**, which this repository intentionally does not contain. Do steps 1–3 first, then add it in step 4.
+
 **Unity Hub は既存の空でないフォルダに新規プロジェクトを作れないことがあります。** そのため「別の場所に作ってから、Unity が生成した部分だけを `software/` へ移す」という手順を取ります。遠回りに見えますが、こちらが確実です。
 
 **Unity Hub may refuse to create a project in a folder that is not empty**, so the reliable route is to create it elsewhere and move only the Unity-generated parts into `software/`.
 
-1. Unity Hub → **New project** → テンプレート **2D (Core)**、バージョン **Unity 6**。プロジェクト名と場所は**リポジトリの外の適当な場所**(例: `~/citai-temp`)にします。
-   Unity Hub → **New project** → template **2D (Core)**, version **Unity 6**. Put it **outside the repository** (e.g. `~/citai-temp`).
+1. Unity Hub → **New project** → バージョン **Unity 6**、テンプレートは **2D**。
+   **Built-In Render Pipeline** 版があればそちらを選んでください。URP(Universal 2D)版はレンダリング設定のアセットへの参照を持つため、移動する対象が増えます。本プロジェクトのUIは Canvas のオーバーレイのみで、URP の機能を使いません。
+   プロジェクト名と場所は**リポジトリの外の適当な場所**(例: `~/citai-temp`)にします。
+   Unity Hub → **New project** → version **Unity 6**, template **2D** — prefer the **Built-In Render Pipeline** variant if offered, since the URP (Universal 2D) one adds render-pipeline assets to move and this project's UI is Canvas-overlay only. Put it **outside the repository** (e.g. `~/citai-temp`).
 2. 一度開いたら Unity を**閉じます**。
    Once it opens, **close** Unity.
-3. 作成された一時プロジェクトから、以下を `software/` に**移動**します(`software/Assets/` の中身は消さずに残す)。
+3. 作成された一時プロジェクトから、以下を `software/` に**移動**します(`software/Assets/` の既存の中身は消さずに残す)。
    Move the following from the temporary project into `software/`, leaving the existing contents of `software/Assets/` intact:
 
-   | 移動するもの / Move | 移動先 / To |
-   | --- | --- |
-   | `ProjectSettings/` | `software/ProjectSettings/` |
-   | `Packages/` | `software/Packages/` |
-   | `Assets/Settings/` (テンプレートが作る設定。あれば) | `software/Assets/Settings/` |
+   | 移動するもの / Move | 移動先 / To | 備考 / Note |
+   | --- | --- | --- |
+   | `ProjectSettings/` | `software/ProjectSettings/` | **これが本命。**Unity Hub がプロジェクトと認識するのに必要 |
+   | `Packages/` | `software/Packages/` | パッケージ構成。`UnityEngine.UI` などの依存が入っている |
+   | `Assets/` 配下にテンプレートが作ったフォルダ | `software/Assets/` | `Settings/`、`Scenes/` など。既存の `Scripts/` `Editor/` とは衝突しない |
 
-   `Library/`、`Logs/`、`Temp/`、`obj/` は**移動しません**(Unity が再生成し、`.gitignore` で除外済み)。
-   Do **not** move `Library/`, `Logs/`, `Temp/`, `obj/` — Unity regenerates them and they are git-ignored.
-4. Unity Hub → **Add** → **Add project from disk** → `software/` を選択して開きます。
-   Unity Hub → **Add** → **Add project from disk** → select `software/` and open it.
+   `Library/`、`Logs/`、`Temp/`、`obj/`、`UserSettings/` は**移動しません**(Unity が再生成し、`.gitignore` で除外済み)。
+   Do **not** move `Library/`, `Logs/`, `Temp/`, `obj/`, `UserSettings/` — Unity regenerates them and they are git-ignored.
+4. Unity Hub → **Add** → **Add project from disk** → `software/` を選択して開きます。今度は認識されます。
+   Unity Hub → **Add** → **Add project from disk** → select `software/`. It is recognized now.
 5. **確認:** Project ウィンドウに `Assets/Scripts/`(`AI`, `Battle`, `Capture`, `Card`, `Core`, `Data`, `UI`)と `Assets/Editor/` が見えていること。見えていなければプロジェクトルートの位置がずれています。
    **Check:** the Project window must show `Assets/Scripts/` (`AI`, `Battle`, `Capture`, `Card`, `Core`, `Data`, `UI`) and `Assets/Editor/`.
 6. 一時プロジェクトのフォルダは削除して構いません。
