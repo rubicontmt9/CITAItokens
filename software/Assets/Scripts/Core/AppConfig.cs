@@ -13,7 +13,7 @@ namespace CitaiTokens.Core
         public const string ResourceName = "AppConfig";
 
         [SerializeField] private string cardProxyUrl = string.Empty;
-        [SerializeField] private bool useMockCardGenerator = true;
+        [SerializeField] private bool useHashOnlyGenerator = false;
         [SerializeField] private int freshPhotoMaxAgeMinutes = 10;
         [SerializeField] private bool requireLocationCheck = false;
         [SerializeField] private float minMetersBetweenCaptures = 30f;
@@ -25,11 +25,19 @@ namespace CitaiTokens.Core
         public string CardProxyUrl => cardProxyUrl;
 
         /// <summary>
-        /// true の間は通信せずローカルでカードを生成する。プロキシ未デプロイでもEditorで一周遊べるようにするため。
-        /// While true, cards are generated locally with no network call, so the loop is playable in the
-        /// Editor before the proxy is deployed.
+        /// true にすると写真の見た目を無視し、バイト列のハッシュだけでカードを生成する。切り分け用。
+        /// When true, cards are generated from a hash of the photo bytes alone, ignoring how the photo
+        /// looks. For narrowing down problems only.
         /// </summary>
-        public bool UseMockCardGenerator => useMockCardGenerator;
+        /// <remarks>
+        /// 既定は false で、写真の見た目から導出する <c>PhotoAnalysisCardGenerator</c> が使われる。
+        /// これがゲームの核なので、通常こちらを切る理由はない。画像解析側の不具合を切り分けたいときだけ
+        /// true にする。
+        /// The default is false, which uses <c>PhotoAnalysisCardGenerator</c> and derives everything from
+        /// the photo's appearance. That is the core of the game, so there is normally no reason to turn it
+        /// off — set this true only to isolate a problem in the analysis.
+        /// </remarks>
+        public bool UseHashOnlyGenerator => useHashOnlyGenerator;
 
         /// <summary>
         /// 「今撮った写真」と認めるまでの分数。これより古い写真は拒否する。

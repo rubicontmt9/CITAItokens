@@ -204,9 +204,9 @@ Scene files (`.unity`) are not committed, because hand-authored YAML breaks easi
 
 ## 4. Play を押す / Press Play
 
-`Main.unity` を開いた状態で **Play** を押します。カード生成は**既定でモック**(`AppConfig.useMockCardGenerator` の初期値が `true`)なので、**プロキシもスマホも不要**です。PC の Web カメラだけで、机の上でゲームループが一周します。
+`Main.unity` を開いた状態で **Play** を押します。カード生成は**既定で端末内の画像解析**(`PhotoAnalysisCardGenerator`)なので、**通信もスマホも不要**です。PC の Web カメラだけで、机の上でゲームループが一周します。
 
-With `Main.unity` open, press **Play**. Card generation uses **the mock generator by default** (`AppConfig.useMockCardGenerator` defaults to `true`), so **no proxy and no phone are required**: the whole loop runs at your desk with a PC webcam.
+With `Main.unity` open, press **Play**. Card generation uses **on-device image analysis by default** (`PhotoAnalysisCardGenerator`), so **no network and no phone are required**: the whole loop runs at your desk with a PC webcam.
 
 - Console に `Assets/Resources/AppConfig.asset が見つかりません` という警告が出ますが、**これは正常です**。設定アセットが無い場合は既定値で起動します(手順 6 で作れます)。
   The Console warns that `Assets/Resources/AppConfig.asset` is missing. **This is expected**: the game starts with defaults when the asset is absent (you can create it in step 6).

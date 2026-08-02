@@ -116,39 +116,45 @@ namespace CitaiTokens.Core
         }
 
         /// <summary>
-        /// カード生成の実装を選ぶ。設定でモックが有効な場合、およびプロキシURLが空の場合はモックを使う。
-        /// URLが空のときにモックへ倒すのは、設定アセットを持たない新規クローンで撮影画面が通信エラーの
-        /// 行き止まりになるのを防ぐため。選択理由はプレイテスト中にコンソールで確認できるよう必ずログに出す。
-        /// Chooses the card-generation implementation: the mock when the config asks for it, and also when the
-        /// proxy URL is blank. Falling back on a blank URL matters because a fresh clone with no config asset
-        /// would otherwise dead-end at the capture screen with a network error. The choice is always logged so
-        /// it is visible in the console during playtests.
+        /// カード生成の実装を選ぶ。既定は写真の見た目から導出する <see cref="PhotoAnalysisCardGenerator"/>。
+        /// 選択理由はプレイテスト中にコンソールで追えるよう必ずログに出す。
+        /// Chooses the card-generation implementation. The default is
+        /// <see cref="PhotoAnalysisCardGenerator"/>, which derives everything from how the photo looks. The
+        /// choice is always logged so it can be followed in the console during playtests.
         /// </summary>
+        /// <remarks>
+        /// 判定の順序は「明示的に指定されたものを優先し、既定に倒す」。プロキシは方針変更前に作った
+        /// 参考実装であり、URLが設定されているときだけ使う (docs/game-mvp-plan.md 2.3)。
+        /// The order is "honour anything explicitly configured, otherwise fall back to the default". The proxy
+        /// is a reference implementation from before the on-device decision and is used only when a URL is set
+        /// (docs/game-mvp-plan.md §2.3).
+        /// </remarks>
         private static ICardGenerator CreateCardGenerator(AppConfig config)
         {
-            if (config.UseMockCardGenerator)
+            if (config.UseHashOnlyGenerator)
             {
                 Debug.Log(
-                    "[GameBootstrap] MockCardGenerator を使います (AppConfig.useMockCardGenerator が true)。"
-                    + "通信は行いません。 / Using MockCardGenerator because AppConfig.useMockCardGenerator is "
-                    + "true; no network calls will be made.");
+                    "[GameBootstrap] MockCardGenerator を使います (AppConfig.useHashOnlyGenerator が true)。"
+                    + "写真の見た目は反映されません。切り分け用の設定です。 / Using MockCardGenerator because "
+                    + "AppConfig.useHashOnlyGenerator is true; the photo's appearance is ignored. This setting "
+                    + "is for isolating problems.");
                 return new MockCardGenerator();
             }
 
-            if (string.IsNullOrWhiteSpace(config.CardProxyUrl))
+            if (!string.IsNullOrWhiteSpace(config.CardProxyUrl))
             {
                 Debug.Log(
-                    "[GameBootstrap] プロキシURLが未設定のため MockCardGenerator にフォールバックします。"
-                    + "実際のAI生成を使うには Assets/Resources/AppConfig.asset に cardProxyUrl を設定してください。 / "
-                    + "Falling back to MockCardGenerator because the proxy URL is empty. Set cardProxyUrl in "
-                    + "Assets/Resources/AppConfig.asset to use real AI generation.");
-                return new MockCardGenerator();
+                    "[GameBootstrap] CardProxyClient を使います (参考実装。MVPの経路ではありません) / "
+                    + "Using CardProxyClient (reference implementation, not the MVP path) against: "
+                    + config.CardProxyUrl);
+                return new CardProxyClient(config.CardProxyUrl);
             }
 
             Debug.Log(
-                "[GameBootstrap] CardProxyClient を使います / Using CardProxyClient against: "
-                + config.CardProxyUrl);
-            return new CardProxyClient(config.CardProxyUrl);
+                "[GameBootstrap] PhotoAnalysisCardGenerator を使います。写真の見た目からステータスを導出し、"
+                + "通信は行いません。 / Using PhotoAnalysisCardGenerator: stats are derived from the photo's "
+                + "appearance and no network calls are made.");
+            return new PhotoAnalysisCardGenerator();
         }
 
         /// <summary>

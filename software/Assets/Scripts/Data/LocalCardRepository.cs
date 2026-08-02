@@ -248,7 +248,10 @@ namespace CitaiTokens.Data
 
             for (var i = 0; i < json.Length; i++)
             {
-                if (char.IsWhiteSpace(json[i]))
+                // BOM も読み飛ばす。File.ReadAllText は通常取り除くが、残っていても判定を誤らせない。
+                // The BOM is skipped too: File.ReadAllText normally strips it, but a surviving one must not
+                // change the verdict.
+                if (char.IsWhiteSpace(json[i]) || json[i] == '\uFEFF')
                 {
                     continue;
                 }

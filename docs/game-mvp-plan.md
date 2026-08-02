@@ -42,15 +42,16 @@ All generation runs on-device. No cloud AI is used.
 段階的に置き換える方針:
 The approach is replaced in stages:
 
-| 段階 / Stage | 生成方式 / Method | 状態 / Status |
+| 生成方式 / Method | 用途 / Use | 状態 / Status |
 | --- | --- | --- |
-| 第一テスト / First test | **写真のバイト列から決定的に導出**(`AI/MockCardGenerator`) | 実装済み / Implemented |
-| 完成版 / Final | **写真の見た目から導出**(方式は 🔶 未決定 — 下記 8 参照) | 未着手 / Not started |
+| **写真の見た目から導出**(`AI/PhotoAnalysisCardGenerator`) | **既定。**色相分布・エッジ量・方向・明暗から武器ジャンル/属性/レアリティ/ステータスを導出(下記 8) | 実装済み / Implemented |
+| 写真のバイト列のハッシュから導出(`AI/MockCardGenerator`) | 画像解析側の不具合を切り分けるとき only。`AppConfig.useHashOnlyGenerator` で有効化 | 実装済み / Implemented |
+| 被写体の切り出し(セグメンテーション) | 太さ・分岐数を実際に測る。代理指標で足りなければ | 🔶 未着手 / Not started |
 
-- 第一テストは「ランダム」で十分だが、実装は**写真のバイト列のハッシュから決定的に**ステータスを導出している。同じ写真からは必ず同じカードが出るため、1枚の写真を撮り直して当たりを引くまで繰り返す抜け道が塞がれる。屋外に出ること自体が目的のゲームなので、この性質は残す価値がある。写真が違えば結果は十分にばらけるため、体感は「ランダム」と変わらない。
-  The first test only needs randomness, but the implementation derives stats **deterministically from a hash of the photo bytes**. The same photo always yields the same card, which closes the loophole of re-submitting one photo until a good roll appears. Since going outside is the point of the game, that property is worth keeping — and different photos still produce visibly different cards, so it feels random in play.
-- 完成版は、枝の太さ・質感・色といった視覚的特徴からステータスを導出することを狙う。機械学習モデルを使うか、学習なしの画像解析で済ませるかは未決定(**8 で3案を比較。推奨は学習なしの案**)。いずれも端末内で完結するため、電波の弱い屋外という主な利用シーンと噛み合う。
-  The final version aims to derive stats from visual features such as thickness, texture, and colour. Whether that uses an ML model or plain image analysis is undecided — **§8 compares three options and recommends the no-training one**. Either way it runs on-device, which suits the weak-signal outdoor use case.
+- **同じ写真からは必ず同じカードが出る。** 導出に時刻も未シードの乱数も使っていない。1枚の写真を撮り直して当たりを引くまで繰り返す抜け道が塞がれる。屋外に出ること自体が目的のゲームなので、この性質は譲れない。
+  **The same photo always yields the same card** — no clock and no unseeded randomness anywhere in the derivation. That closes the loophole of re-submitting one photo until a good roll appears, which matters because going outside is the point of the game.
+- 導出の反復は **Editor の `Tools → CITAItokens → Card Preview`** で行う。手持ちの写真フォルダを一括解析するため、カメラ・権限・シーン・実機のいずれも不要。
+  Iteration happens in the Editor via `Tools → CITAItokens → Card Preview`, which batch-analyses a folder of existing photos — no camera, permissions, scene, or device needed.
 - **カード画像は撮影した写真そのものを使う。イラストや画像はAI生成せず、必要なものは人力で用意する。**
   Cards use the captured photo itself. Illustrations and images are **not** AI-generated; anything needed is produced by hand.
 - 生成方式は `ICardGenerator` インターフェース越しに呼ばれており、実装を差し替えても撮影・コレクション・バトルの各層は変更不要。
@@ -62,9 +63,9 @@ The approach is replaced in stages:
 
 The MVP needs **no backend** — on-device generation requires neither network nor server.
 
-`services/card-proxy/` にクラウドAI経由の生成を行うプロキシ実装が残っているが、これは**MVPの経路ではない参考実装**である。クラウドAIを検討していた段階で作成し、動作確認まで済んでいるため保管してある。使う場合は `AppConfig` の `cardProxyUrl` を設定し `useMockCardGenerator` を切ると有効になる。既定は無効。
+`services/card-proxy/` にクラウドAI経由の生成を行うプロキシ実装が残っているが、これは**MVPの経路ではない参考実装**である。クラウドAIを検討していた段階で作成し、動作確認まで済んでいるため保管してある。使う場合は `AppConfig` の `cardProxyUrl` を設定すると有効になる。既定は空欄で無効。
 
-`services/card-proxy/` still contains a proxy that generates cards via a cloud AI. It is a **reference implementation, not part of the MVP path** — built and smoke-tested while cloud AI was under consideration, and kept for reference. To use it, set `cardProxyUrl` in `AppConfig` and turn off `useMockCardGenerator`; it is disabled by default.
+`services/card-proxy/` still contains a proxy that generates cards via a cloud AI. It is a **reference implementation, not part of the MVP path** — built and smoke-tested while cloud AI was under consideration, and kept for reference. To use it, set `cardProxyUrl` in `AppConfig`; it is empty and therefore disabled by default.
 
 - クラウド経路を使う場合でも、クライアントから直接AI APIを叩かせない設計は維持する。屋外で実機を持ち歩く前提のため、APIキーをアプリバイナリに埋め込むと抽出される。
   Even on the cloud path, the client must never call the AI API directly: the app is carried outdoors on real devices, and a key embedded in the binary can be extracted.
@@ -77,7 +78,7 @@ The MVP needs **no backend** — on-device generation requires neither network n
 Card
 ├── id                : string (GUID)
 ├── name              : string   (生成 / generated)
-├── weaponGenre       : enum     🔶 未実装 / not yet implemented — game-design.md 4.0
+├── weaponGenre       : enum { Club, Spear, Staff, Bow, Shield, Dagger }  ← game-design.md 4.0
 ├── element           : enum { Wood, Water, Earth }
 ├── rarity            : enum { Common, Uncommon, Rare, Epic }
 ├── stats             : { hp, attack, defense, speed : int }
@@ -241,7 +242,11 @@ The whole loop must run on a real device with **no network at all**. The on-devi
 
 ## 7. セーブデータのスキーマバージョン / Save Schema Versioning
 
-**現状は未対応。** `collection.json` は `List<Card>` をそのまま保存しており、バージョン番号を持たない。
+**✅ 対応済み(`LocalCardRepository.CurrentSchemaVersion = 1`)。** 武器ジャンルの追加がまさに「フィールドを足すと既存セーブが読めなくなる」ケースだったため、同時に導入した。
+
+**Done** (`LocalCardRepository.CurrentSchemaVersion = 1`). Adding the weapon genre was exactly the "a new field breaks old saves" case, so the versioning landed with it.
+
+導入前は `collection.json` が `List<Card>` をそのままの形で保存しており、バージョン番号を持たなかった。
 
 `Card` に項目を足す・意味を変える改修が入った時点で、既存のセーブデータが読めなくなるか、無音で不正な値が入る。**プレイヤーが屋外を歩いて集めたカードを失う**ため、これは軽い問題ではない。
 
@@ -258,7 +263,13 @@ The whole loop must run on a real device with **no network at all**. The on-devi
 - 未知の(より新しい)バージョンを読んだ場合は、**上書き保存せず**エラーを出す。古いアプリで新しいセーブを壊さないため。
 - 破損時は既存実装どおり `collection.corrupt-<timestamp>.json` に退避して空から始める(既に実装済み)。
 
-⚠️ **これは `LocalCardRepository` の変更を要するため、他の実装より先に入れるべき。** 後から入れると、既にプレイテストで溜めたデータの移行が必要になる。
+実装した挙動:
+- バージョン付きのラッパーを読む → 通常どおり読み込む
+- **バージョン導入前の素の配列**を読む → v0 として読み込み、移行した旨をログに出す。プレイテストで溜めたデータを捨てないため
+- **現在より新しいバージョン**を読む → 読み込まず、**ファイルも上書きしない**。古いビルドが新しいセーブを壊さないため
+- パース不能 → `collection.corrupt-<timestamp>.json` に退避して空から開始(従来どおり)
+
+Implemented behaviour: a versioned wrapper loads normally; a bare pre-versioning array loads as v0 with a migration log (so existing playtest data is not thrown away); a **newer** version is neither loaded **nor overwritten**, so an older build cannot clobber a newer save; unparseable files are set aside as `collection.corrupt-<timestamp>.json` and the collection starts empty.
 
 ---
 

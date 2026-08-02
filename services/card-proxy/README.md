@@ -134,8 +134,8 @@ Set **`cardProxyUrl`** on the game's `AppConfig` asset (`Assets/Resources/AppCon
 ❌ https://card-proxy.<your-subdomain>.workers.dev/generate  ← /generate は付けない / do not append
 ```
 
-`AppConfig` の `useMockCardGenerator` を `false` にすると実際にこのプロキシを叩きます。`true` の間は通信せずローカル生成のままです。
-Set `useMockCardGenerator` to `false` on the same asset to actually call this proxy; while it is `true` the client generates cards locally with no network call.
+`AppConfig` の `cardProxyUrl` にURLを設定すると実際にこのプロキシを叩きます。空欄の間は端末内の画像解析でカードを生成します(既定)。
+Setting `cardProxyUrl` on that asset makes the client call this proxy; while it is empty the client derives cards from on-device image analysis (the default).
 
 ---
 

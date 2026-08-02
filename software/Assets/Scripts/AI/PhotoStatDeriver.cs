@@ -26,6 +26,43 @@ namespace CitaiTokens.AI
         /// <summary>FNV-1a 32bit の素数。 / FNV-1a 32-bit prime.</summary>
         private const uint FnvPrime = 16777619u;
 
+        // ---- 代理指標の中心化 / Centering the proxies -------------------------------------------------
+        // 生の特徴量をそのまま比較すると、実写での分布が偏っているジャンルが常に勝つ/常に負ける。
+        // 例: 屋外写真の DarkRatio は 0.2 前後に固まりやすいので、「暗い塊が大きい」を要求する棍棒と盾は
+        // ほぼ選ばれなくなる。そこで各特徴量を「実写での典型値」で中心化し、0.5 を平均、上下に広げてから採点する。
+        // これで判定は絶対値ではなく「他の写真と比べて濃いか薄いか」になり、6ジャンルにばらけるようになる。
+        // 典型値と広げ幅は当て推量。実写を数十枚集めて各特徴量の平均を測り、必ず引き直すこと。
+        //
+        // Comparing raw features makes some genres unwinnable: outdoor photos cluster around DarkRatio ~0.2, so Club
+        // and Shield — which both demand a large dark mass — would almost never be chosen. Each feature is therefore
+        // centered on its assumed typical value, mapping the typical photo to 0.5 and spreading from there, so
+        // scoring asks "darker than other photos?" rather than "dark in absolute terms?". That is what keeps the six
+        // genres from collapsing onto one. The typical values and the gain below are guesses and must be
+        // re-derived by measuring the means over a few dozen real photos.
+
+        /// <summary>実写で想定するエッジ量の典型値。 / Assumed typical edge density in real photos.</summary>
+        public const float TypicalEdgeDensity = 0.45f;
+
+        /// <summary>実写で想定する方向の揃い方の典型値。自然物は概して低い。 / Assumed typical edge directionality; natural subjects run low.</summary>
+        public const float TypicalEdgeDirectionality = 0.30f;
+
+        /// <summary>実写で想定する暗い画素の割合の典型値。屋外は明るいので低い。 / Assumed typical dark ratio; outdoors is bright, so this is low.</summary>
+        public const float TypicalDarkRatio = 0.25f;
+
+        /// <summary>実写で想定するコントラストの典型値。 / Assumed typical contrast.</summary>
+        public const float TypicalContrast = 0.45f;
+
+        /// <summary>実写で想定する彩度の典型値。 / Assumed typical saturation.</summary>
+        public const float TypicalSaturation = 0.35f;
+
+        /// <summary>
+        /// 中心化の広げ幅。典型値から ±(1 / 2 / <see cref="ProxyGain"/>) 離れると 0 か 1 に振り切れる。
+        /// 2.0 なら ±0.25 で振り切れるので、標準偏差 0.15 前後の分布をほぼ全域に広げられる。
+        /// Centering gain: a feature saturates at 0 or 1 once it is 1/(2 x gain) away from typical. At 2.0 that is
+        /// ±0.25, which spreads a distribution with a standard deviation around 0.15 across most of the range.
+        /// </summary>
+        public const float ProxyGain = 2.0f;
+
         // ---- ジャンル判定の重み / Genre scoring weights -------------------------------------------------
         // 各ジャンルのスコアは「0〜1 の項の重み付き平均」として求め、必ず 0〜1 に収まるようにしている。
         // こうしないと項の数が多いジャンルが常勝してしまう。
@@ -137,8 +174,11 @@ namespace CitaiTokens.AI
         /// <summary>防御の基準値。 / Baseline defense.</summary>
         public const float BaseDefense = 14f;
 
-        /// <summary>速さの基準値。 / Baseline speed.</summary>
-        public const float BaseSpeed = 24f;
+        /// <summary>
+        /// 速さの基準値。短剣 (×1.65) と極レア (×1.24) が重なっても上限 50 に張り付きにくい値として 22 を置く。
+        /// Baseline speed. 22 keeps a Dagger (x1.65) at Epic (x1.24) from pinning to the ceiling of 50.
+        /// </summary>
+        public const float BaseSpeed = 22f;
 
         /// <summary>
         /// 属性によるステータス補正の幅。ジャンル倍率が 0.55〜1.65 なのに対し、こちらは意図的に 1 割未満。
@@ -243,6 +283,13 @@ namespace CitaiTokens.AI
         /// <param name="f">写真の特徴量。 / The photo's features.</param>
         public static float ScoreGenre(WeaponGenre genre, PhotoFeatures f)
         {
+            // 採点はすべて中心化した値で行う。生の値では実写の偏りでジャンルが偏る。
+            // Scoring runs entirely on centered values; raw values let the real-world skew pick the genre.
+            var edges = Centered(f.EdgeDensity, TypicalEdgeDensity);
+            var direction = Centered(f.EdgeDirectionality, TypicalEdgeDirectionality);
+            var mass = Centered(f.DarkRatio, TypicalDarkRatio);
+            var contrast = Centered(f.Contrast, TypicalContrast);
+
             switch (genre)
             {
                 case WeaponGenre.Spear:
@@ -250,60 +297,60 @@ namespace CitaiTokens.AI
                     // Straight and simple: aligned edges, few of them.
                     return WeightedAverage(
                         SpearDirectionalityWeight,
-                        f.EdgeDirectionality,
+                        direction,
                         SpearSimplicityWeight,
-                        1f - f.EdgeDensity);
+                        1f - edges);
 
                 case WeaponGenre.Staff:
                     // 込み入って散らばっている: エッジが多く、方向が揃っていない。
                     // Busy and scattered: many edges, poorly aligned.
                     return WeightedAverage(
                         StaffBusynessWeight,
-                        f.EdgeDensity,
+                        edges,
                         StaffScatterWeight,
-                        1f - f.EdgeDirectionality);
+                        1f - direction);
 
                 case WeaponGenre.Club:
                     // 大きな暗い塊で、エッジが少なく、それでも陰影がある (= 立体的に太い)。
                     // A large dark mass with few edges but still some shading, read as three-dimensional bulk.
                     return WeightedAverage(
                         ClubMassWeight,
-                        f.DarkRatio,
+                        mass,
                         ClubSimplicityWeight,
-                        1f - f.EdgeDensity,
+                        1f - edges,
                         ClubContrastWeight,
-                        f.Contrast);
+                        contrast);
 
                 case WeaponGenre.Shield:
                     // 大きな暗い塊で、コントラストが低く、エッジが極端に少ない (= 平たい面)。
                     // A large dark mass, low contrast, very few edges: a flat broad face.
                     return WeightedAverage(
                         ShieldMassWeight,
-                        f.DarkRatio,
+                        mass,
                         ShieldFlatnessWeight,
-                        1f - f.EdgeDensity,
+                        1f - edges,
                         ShieldLowContrastWeight,
-                        1f - f.Contrast);
+                        1f - contrast);
 
                 case WeaponGenre.Dagger:
                     // 暗い面積が小さく、コントラストが高く、エッジが立っている (= 小さくて鋭い)。
                     // A small dark area, high contrast, crisp edges: small and sharp.
                     return WeightedAverage(
                         DaggerSmallnessWeight,
-                        1f - f.DarkRatio,
+                        1f - mass,
                         DaggerContrastWeight,
-                        f.Contrast,
+                        contrast,
                         DaggerEdgeWeight,
-                        f.EdgeDensity);
+                        edges);
 
                 default:
                     // 弓: 方向もエッジ量も中くらい。極端でない写真の受け皿になる。
                     // Bow: middling on both directionality and edges; it catches the un-extreme photos.
                     return WeightedAverage(
                         BowDirectionalityWeight,
-                        Tent(f.EdgeDirectionality, BowIdealDirectionality, BowTolerance),
+                        Tent(direction, BowIdealDirectionality, BowTolerance),
                         BowEdgeWeight,
-                        Tent(f.EdgeDensity, BowIdealEdgeDensity, BowTolerance));
+                        Tent(edges, BowIdealEdgeDensity, BowTolerance));
             }
         }
 
@@ -315,23 +362,28 @@ namespace CitaiTokens.AI
         /// <param name="photoHash">写真バイト列のハッシュ。揺らぎの種。 / Hash of the photo bytes, used as the jitter seed.</param>
         /// <remarks>
         /// 狙っている分布は docs/game-design.md §4.1 の目安に合わせた 並 55% / 上 28% / 希少 13% / 極 4%。
-        /// ただし実写の彩度・コントラストの分布が分からないため、しきい値は未調整。実写を数十枚集めて
+        /// 「実写の特徴量は平均 <see cref="TypicalSaturation"/> 前後・標準偏差 0.15 程度」と仮定した机上の試算では
+        /// 約 61 / 26 / 11 / 2.5 % になる。ただしこの仮定自体が当て推量なので、しきい値は未調整。実写を数十枚集めて
         /// スコアのヒストグラムを見てから引き直す必要がある。特に「極」が出過ぎないことは必ず確認すること。
         ///
         /// The intended distribution is 55/28/13/4 (Common/Uncommon/Rare/Epic), matching the guide numbers in
-        /// docs/game-design.md §4.1. The thresholds are untuned: the real distribution of saturation and contrast
+        /// docs/game-design.md §4.1. A paper simulation that assumes features average around the Typical* constants
+        /// with a standard deviation near 0.15 lands at roughly 61/26/11/2.5, but that assumption is itself a guess,
+        /// so the thresholds count as untuned: the real distribution of saturation and contrast
         /// in outdoor photos is unknown, so they must be re-derived from a histogram over a few dozen real photos.
         /// Verify above all that Epic stays genuinely rare.
         /// </remarks>
         public static Rarity DeriveRarity(PhotoFeatures f, uint photoHash)
         {
+            // ここも中心化した値を使う。生の値だと実写の彩度が低めに寄るため「極」がほぼ出なくなる。
+            // Centered values again: with raw values, real photos skew low on saturation and Epic never appears.
             var featureScore = WeightedAverage(
                 RaritySaturationWeight,
-                f.MeanSaturation,
+                Centered(f.MeanSaturation, TypicalSaturation),
                 RarityContrastWeight,
-                f.Contrast,
+                Centered(f.Contrast, TypicalContrast),
                 RarityEdgeWeight,
-                f.EdgeDensity);
+                Centered(f.EdgeDensity, TypicalEdgeDensity));
 
             // ハッシュから -1〜1 の値を作り、振幅を掛けて足す。特徴量の寄与が主で、これは従。
             // Build a -1..1 value from the hash and scale it. The feature score dominates; this only nudges.
@@ -393,7 +445,7 @@ namespace CitaiTokens.AI
         /// <param name="element">属性 (補正は小)。 / The element, a minor modifier.</param>
         /// <param name="rarity">レアリティ。 / The rarity tier.</param>
         /// <remarks>
-        /// ⏸️ バランス調整は保留と決まっている (docs/game-design.md §4.1)。ステータス総量の予算制は入れていないので、
+        /// (保留) バランス調整は後回しと決まっている (docs/game-design.md §4.1)。ステータス総量の予算制は入れていないので、
         /// 「攻撃が高く HP も高い」「1撃で終わる」といった極端な組み合わせは今も生成されうる。意図した修正案と
         /// その換算式は §4.1 に記録済み。当面は 50 ラウンドの打ち切り上限があるためゲームが停止することはない。
         ///
@@ -445,10 +497,17 @@ namespace CitaiTokens.AI
             //   ATK   ← コントラスト (鋭く見えるほど強く当たる)       / contrast: looks sharper, so hits harder
             //   DEF   ← 彩度 (色が濃い個体は詰まった木と見なす)        / saturation: richer colour reads as denser wood
             //   SPD   ← 方向の揃い方 (真っ直ぐなほど振りが速い)        / directionality: straighter swings faster
-            var hp = BaseHp * hpMultiplier * rarityMultiplier * Variation(f.DarkRatio);
-            var attack = BaseAttack * attackMultiplier * rarityMultiplier * Variation(f.Contrast);
-            var defense = BaseDefense * defenseMultiplier * rarityMultiplier * Variation(f.MeanSaturation);
-            var speed = BaseSpeed * speedMultiplier * rarityMultiplier * Variation(f.EdgeDirectionality);
+            // 変動もジャンル判定と同じ中心化した値を使う。生の値だと全カードが同じ方向に寄ってしまう。
+            // The variation uses the same centered values as genre scoring; raw values would skew every card the
+            // same way instead of spreading them.
+            var hp = BaseHp * hpMultiplier * rarityMultiplier
+                * Variation(Centered(f.DarkRatio, TypicalDarkRatio));
+            var attack = BaseAttack * attackMultiplier * rarityMultiplier
+                * Variation(Centered(f.Contrast, TypicalContrast));
+            var defense = BaseDefense * defenseMultiplier * rarityMultiplier
+                * Variation(Centered(f.MeanSaturation, TypicalSaturation));
+            var speed = BaseSpeed * speedMultiplier * rarityMultiplier
+                * Variation(Centered(f.EdgeDirectionality, TypicalEdgeDirectionality));
 
             return new StatBlock(
                 Mathf.RoundToInt(hp),
@@ -524,6 +583,18 @@ namespace CitaiTokens.AI
                     speed = 0.65f;
                     return;
             }
+        }
+
+        /// <summary>
+        /// 特徴量を「実写での典型値」で中心化する。典型値が 0.5 に写り、<see cref="ProxyGain"/> の分だけ上下に広がる。
+        /// Centers a feature on its assumed typical value: typical maps to 0.5, and <see cref="ProxyGain"/> sets how
+        /// fast it spreads from there.
+        /// </summary>
+        /// <param name="value">生の特徴量 (0〜1)。 / The raw feature, 0–1.</param>
+        /// <param name="typical">実写で想定する平均値。 / The assumed mean in real photos.</param>
+        public static float Centered(float value, float typical)
+        {
+            return Mathf.Clamp01(0.5f + ((value - typical) * ProxyGain));
         }
 
         /// <summary>
