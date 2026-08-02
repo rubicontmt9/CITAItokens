@@ -33,8 +33,10 @@ software/
 
 1. Unity Hub で本フォルダ (`software/`) を既存プロジェクトとして開く、または新規プロジェクトを作成しこの場所に配置してください。
    Open this folder (`software/`) as an existing project in Unity Hub, or create a new project and place it here.
-2. Unity バージョンは **2022 LTS** を想定しています。プロジェクト作成後、実際のバージョンが `ProjectSettings/ProjectVersion.txt` に記録されるので、確定したらこの README にも明記してください。
-   Unity **2022 LTS** is the intended version. The actual version is recorded in `ProjectSettings/ProjectVersion.txt` once the project is created; note it here when confirmed.
+2. Unity バージョンは **Unity 6 (6000.x)** を使用します。プロジェクト作成後、実際のバージョンが `ProjectSettings/ProjectVersion.txt` に記録されるので、確定したらこの README にも明記してください。
+   **Unity 6 (6000.x)** is the version in use. The actual version is recorded in `ProjectSettings/ProjectVersion.txt` once the project is created; note it here when confirmed.
+   ⚠️ Unity 6 では **Player Settings → Active Input Handling を `Both`** にする必要があります。既定の新 Input System のみだとボタンが反応せず、位置情報も取得できない可能性があります(詳細は [`../docs/setup-unity.md`](../docs/setup-unity.md))。
+   ⚠️ On Unity 6, **Player Settings → Active Input Handling must be `Both`** — with the default new-Input-System-only setting, buttons do not respond and location reads may fail. See [`../docs/setup-unity.md`](../docs/setup-unity.md).
 3. ビルド対象は **Android を優先**します(実機での反復が速いため)。iOS は後追いです。
    Build target is **Android first** (faster on-device iteration); iOS comes later.
 4. 必要パッケージ: ネイティブカメラ連携用パッケージ、`Newtonsoft.Json`。

@@ -11,12 +11,87 @@ This is the path from a fresh clone of this repository to a running game. Budget
 
 ## 0. 前提 / Prerequisites
 
-- **Unity Hub** と **Unity 2022 LTS** (`2022.3.x`)。最新の `6000.x` 系は使いません(`docs/game-mvp-plan.md` の技術方針どおり)。
-  **Unity Hub** and **Unity 2022 LTS** (`2022.3.x`). The newer `6000.x` line is intentionally not used, per the technical decisions in `docs/game-mvp-plan.md`.
+- **Unity Hub** と **Unity 6** (`6000.x`)。当初 2022 LTS を想定していましたが、Unity Hub から入手できないため Unity 6 を使います。本プロジェクトが使う機能はすべて Unity 6 で利用できます。
+  **Unity Hub** and **Unity 6** (`6000.x`). The plan originally assumed 2022 LTS, but it is not obtainable from Unity Hub; everything this project uses works on Unity 6.
+- **Git**。コマンドラインの `git`、または **GitHub Desktop**(GUI)のどちらでも構いません。
+  **Git** — either the `git` command line or **GitHub Desktop** (GUI).
 - Android 実機ビルドまで行う場合は、Unity インストール時に **Android Build Support**(OpenJDK と Android SDK & NDK Tools を含む)を追加してください。
   If you intend to build to an Android device, add **Android Build Support** (including OpenJDK and the Android SDK & NDK Tools) when installing Unity.
 - 手順 4(Editor でのプレイ)には PC の Web カメラがあると便利です。外に出る必要はありません。
   A PC webcam makes step 4 (playing in the Editor) much easier. You do not need to go outside.
+
+---
+
+## 0.5 GitHub からリポジトリを取得する / Get the repository from GitHub
+
+**Unity には GitHub 連携機能はありません。** Unity は「フォルダの中身」しか見ないので、**Git でリポジトリをクローンし、そのフォルダを Unity で開く**という関係になります。Unity 側で特別な設定は要りません。
+
+**Unity has no GitHub integration.** Unity only sees a folder on disk, so the relationship is: **clone the repository with Git, then open that folder in Unity.** Nothing special is configured on the Unity side.
+
+```
+GitHub (リモート)
+   ↕ git clone / commit / push        ← Git または GitHub Desktop が担当
+ローカルの CITAItokens/              ← ただのフォルダ
+   └── software/                     ← これを Unity Hub で開く
+```
+
+### 手順 / Steps
+
+**コマンドラインの場合 / Command line:**
+
+```sh
+git clone https://github.com/rubicontmt9/CITAItokens.git
+cd CITAItokens
+git switch claude/game-implementation-plan-uszy2p
+```
+
+**GitHub Desktop の場合 / GitHub Desktop:**
+
+1. **File → Clone repository** → `rubicontmt9/CITAItokens` を選択。
+   **File → Clone repository** → pick `rubicontmt9/CITAItokens`.
+2. 上部の **Current branch** から `claude/game-implementation-plan-uszy2p` を選択。
+   Select `claude/game-implementation-plan-uszy2p` from **Current branch**.
+
+⚠️ **`main` ではなく作業ブランチ `claude/game-implementation-plan-uszy2p` を使ってください。** コードと計画はすべてこのブランチにあり、`main` にはまだ雛形しかありません。
+⚠️ **Use the working branch, not `main`.** All the code and planning live on `claude/game-implementation-plan-uszy2p`; `main` still holds only the scaffolding.
+
+### 変更を GitHub に戻す / Pushing changes back
+
+Unity で作業した結果(生成された `ProjectSettings/`、`.meta`、シーン、アート素材など)をコミットして push します。
+
+```sh
+git add -A
+git status          # ← 何が入るか必ず確認する
+git commit -m "chore: Unity プロジェクトを作成し初回コンパイルを通す"
+git push
+```
+
+push するとこのブランチの Pull Request (#1) が自動的に更新されます。新しく PR を作る必要はありません。
+
+Pushing updates Pull Request #1 for this branch automatically; there is no need to open a new one.
+
+### コミットして良いもの / 除外されるもの
+
+`.gitignore` は既に設定済みなので、基本は `git add -A` で問題ありません。中身の判断は以下です。
+
+`.gitignore` is already configured, so `git add -A` is normally safe. For reference:
+
+| コミットする / Commit | 除外される / Ignored |
+| --- | --- |
+| `ProjectSettings/` | `Library/`(巨大な再生成キャッシュ) |
+| `Packages/manifest.json`, `packages-lock.json` | `Temp/`, `Logs/`, `obj/`, `Build/` |
+| **すべての `.meta`** (GUIDが入っている。必須) | `*.csproj`, `*.sln`(IDE用の生成物) |
+| `Assets/` 配下のスクリプト・シーン・素材 | `Assets/Resources/AppConfig.asset`(環境ごとの設定) |
+
+⚠️ `git status` で意図しないファイルが入っていないか確認する習慣をつけてください。特に**APIキーや個人設定を含むファイルを push しないよう**注意してください。
+
+⚠️ Get into the habit of checking `git status` before committing — in particular, **never push a file containing an API key or personal configuration.**
+
+### 画像素材が増えてきたら / Once art assets pile up 🔶
+
+PNG などのバイナリは Git と相性が悪く(差分が取れず履歴が膨らむ)、**Git LFS** の導入を検討する価値があります。ただし後から導入すると履歴の書き換えが必要になるため、**アート素材を本格的に入れ始める前に判断**してください。MVP の段階では不要です。
+
+Binary assets like PNGs bloat Git history. **Git LFS** is worth considering, but retrofitting it requires rewriting history — so decide **before** art assets start landing in bulk. Not needed at the MVP stage.
 
 ---
 
@@ -26,17 +101,34 @@ This is the path from a fresh clone of this repository to a running game. Budget
 
 This repository contains **only the parts Unity does not generate**. `software/Assets/Scripts/` and `software/Assets/Editor/` hold the C# code; `ProjectSettings/`, `Packages/`, `Assets/Scenes/` and `Library/` do not exist yet. The Unity project you create must **overlap the existing folder**, not sit next to it.
 
-1. Unity Hub → **New project** → テンプレートは **2D (Core)**、Unity バージョンは **2022 LTS**。
-   Unity Hub → **New project** → template **2D (Core)**, Unity version **2022 LTS**.
-2. プロジェクト名とロケーションを、作成後のプロジェクトルートが **リポジトリの `software/`** になるように指定します。例えば Location に `<clone先>/CITAItokens`、Project name に `software` を入れると `CITAItokens/software/` がプロジェクトルートになります。
-   Set the project name and location so that the resulting project root **is** the repository's `software/` directory. For example, Location = `<your-clone>/CITAItokens` and Project name = `software` gives a project root of `CITAItokens/software/`.
-3. Unity Hub が「フォルダが空ではない」と警告した場合は、そのまま続行して構いません。Unity は既存の `Assets/` を消さず、足りないフォルダを追加します。
-   If Unity Hub warns that the folder is not empty, continue: Unity adds the folders it needs without deleting the existing `Assets/`.
-4. **確認:** プロジェクトを開いたら、Project ウィンドウに `Assets/Scripts/`(`AI`, `Battle`, `Capture`, `Card`, `Core`, `Data`, `UI`)と `Assets/Editor/` が見えているはずです。見えていない場合はプロジェクトルートの位置がずれているので、`software/Assets/Scripts/` が **プロジェクトの `Assets/` の中**に入るように置き直してください。
-   **Check:** once the project opens, the Project window must show `Assets/Scripts/` (`AI`, `Battle`, `Capture`, `Card`, `Core`, `Data`, `UI`) and `Assets/Editor/`. If it does not, the project root is in the wrong place — move things so that `software/Assets/Scripts/` ends up **inside the created project's `Assets/`**.
+**Unity Hub は既存の空でないフォルダに新規プロジェクトを作れないことがあります。** そのため「別の場所に作ってから、Unity が生成した部分だけを `software/` へ移す」という手順を取ります。遠回りに見えますが、こちらが確実です。
 
-> `.meta` ファイルはリポジトリに含めていません。Unity が初回インポート時に自動生成します(生成された `.meta` はコミットして構いません)。
-> No `.meta` files are committed. Unity generates them on first import; the generated ones can be committed.
+**Unity Hub may refuse to create a project in a folder that is not empty**, so the reliable route is to create it elsewhere and move only the Unity-generated parts into `software/`.
+
+1. Unity Hub → **New project** → テンプレート **2D (Core)**、バージョン **Unity 6**。プロジェクト名と場所は**リポジトリの外の適当な場所**(例: `~/citai-temp`)にします。
+   Unity Hub → **New project** → template **2D (Core)**, version **Unity 6**. Put it **outside the repository** (e.g. `~/citai-temp`).
+2. 一度開いたら Unity を**閉じます**。
+   Once it opens, **close** Unity.
+3. 作成された一時プロジェクトから、以下を `software/` に**移動**します(`software/Assets/` の中身は消さずに残す)。
+   Move the following from the temporary project into `software/`, leaving the existing contents of `software/Assets/` intact:
+
+   | 移動するもの / Move | 移動先 / To |
+   | --- | --- |
+   | `ProjectSettings/` | `software/ProjectSettings/` |
+   | `Packages/` | `software/Packages/` |
+   | `Assets/Settings/` (テンプレートが作る設定。あれば) | `software/Assets/Settings/` |
+
+   `Library/`、`Logs/`、`Temp/`、`obj/` は**移動しません**(Unity が再生成し、`.gitignore` で除外済み)。
+   Do **not** move `Library/`, `Logs/`, `Temp/`, `obj/` — Unity regenerates them and they are git-ignored.
+4. Unity Hub → **Add** → **Add project from disk** → `software/` を選択して開きます。
+   Unity Hub → **Add** → **Add project from disk** → select `software/` and open it.
+5. **確認:** Project ウィンドウに `Assets/Scripts/`(`AI`, `Battle`, `Capture`, `Card`, `Core`, `Data`, `UI`)と `Assets/Editor/` が見えていること。見えていなければプロジェクトルートの位置がずれています。
+   **Check:** the Project window must show `Assets/Scripts/` (`AI`, `Battle`, `Capture`, `Card`, `Core`, `Data`, `UI`) and `Assets/Editor/`.
+6. 一時プロジェクトのフォルダは削除して構いません。
+   The temporary project folder can be deleted.
+
+> **`.meta` ファイルは必ずコミットしてください。** リポジトリには含まれておらず、Unity が初回インポート時に生成します。`.meta` には各アセットのGUIDが入っており、**コミットし忘れると別のクローンで参照が壊れます**(スクリプトがコンポーネントから外れる等)。「生成物だから無視する」は誤りです。
+> **Always commit the `.meta` files.** They are not in the repository; Unity generates them on first import. Each one carries the asset's GUID, so **omitting them breaks references in any other clone** (scripts detach from components). They are generated, but they are not disposable.
 
 ---
 
@@ -54,6 +146,39 @@ This repository contains **only the parts Unity does not generate**. `software/A
    Enter `com.unity.nuget.newtonsoft-json` and click **Add**. Leave the version field empty.
 4. インポートが終わったら、Console に `Newtonsoft` 関連のコンパイルエラーが残っていないことを確認します。
    When the import finishes, confirm the Console no longer shows `Newtonsoft`-related compile errors.
+
+---
+
+## 2.5 Unity 6 で必須の設定 / Required settings on Unity 6
+
+**Unity 6 の新規プロジェクトは新 Input System が既定**になっており、そのままだと不具合が2つ出ます。設定を1つ変えて両方回避します。
+
+New Unity 6 projects default to the **new Input System only**, which causes two problems. One setting avoids both.
+
+1. **Edit → Project Settings → Player → Other Settings → Active Input Handling** を **`Both`** に変更します。
+   Set **Edit → Project Settings → Player → Other Settings → Active Input Handling** to **`Both`**.
+2. 変更すると Unity の再起動を求められます。再起動してください。
+   Unity will ask to restart. Restart it.
+
+**なぜ必要か / Why:**
+
+| 問題 / Problem | 症状 / Symptom |
+| --- | --- |
+| `StandaloneInputModule` が新 Input System 下で機能しない | **ボタンが一切反応しない。**エラーも警告も出ないため原因が分かりにくい |
+| `Input.location` が使えない可能性 | 位置情報による移動距離チェックが動かない |
+
+1つ目はコード側でも対応済みです(`GameBootstrap` が `ENABLE_INPUT_SYSTEM` を見て `InputSystemUIInputModule` に切り替えます)。ただし2つ目はコードで回避できないため、`Both` の設定が必要です。
+
+The first is also handled in code (`GameBootstrap` switches to `InputSystemUIInputModule` when `ENABLE_INPUT_SYSTEM` is defined), but the second cannot be worked around in code, so `Both` is required.
+
+### Git と併用するための設定 / Settings for working with Git
+
+**Edit → Project Settings → Editor** で以下を確認してください。差分が読める形になり、コンフリクトが起きにくくなります。
+
+Check these under **Edit → Project Settings → Editor** so that diffs are readable and conflicts are rarer:
+
+- **Version Control → Mode** = `Visible Meta Files`
+- **Asset Serialization → Mode** = `Force Text`
 
 ---
 

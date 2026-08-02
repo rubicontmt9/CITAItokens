@@ -150,8 +150,11 @@ namespace CitaiTokens.Core
         /// </summary>
         private static void CreateEventSystem()
         {
-            var existing = UnityEngine.Object.FindObjectOfType<EventSystem>();
-            if (existing != null)
+            // 既存判定に FindObjectOfType は使わない。Unity 6 で非推奨になっている一方、
+            // EventSystem.current は全バージョンで使える本来のAPIであるため。
+            // FindObjectOfType is avoided here: it is obsolete in Unity 6, whereas EventSystem.current
+            // is the intended API and exists in every version.
+            if (EventSystem.current != null)
             {
                 Debug.Log(
                     "[GameBootstrap] EventSystem が既に存在するため再利用します。 / "
@@ -159,14 +162,27 @@ namespace CitaiTokens.Core
                 return;
             }
 
-            var eventSystemObject = new GameObject(
-                "EventSystem",
-                typeof(EventSystem),
-                typeof(StandaloneInputModule));
+            var eventSystemObject = new GameObject("EventSystem", typeof(EventSystem));
+
+            // 入力モジュールは Player Settings の Active Input Handling に合わせて選ぶ。
+            // 新 Input System が有効なとき StandaloneInputModule は動作せず、
+            // ボタンが一切反応しないという分かりにくい不具合になる。Unity 6 の新規
+            // プロジェクトは新 Input System が既定なので、ここは分岐が必須。
+            // The input module must match Player Settings → Active Input Handling. Under the new Input
+            // System, StandaloneInputModule silently does nothing and every button appears dead —
+            // and the new Input System is the default for new Unity 6 projects, so this branch matters.
+#if ENABLE_INPUT_SYSTEM
+            eventSystemObject.AddComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
+            var moduleName = "InputSystemUIInputModule";
+#else
+            eventSystemObject.AddComponent<StandaloneInputModule>();
+            var moduleName = "StandaloneInputModule";
+#endif
 
             Debug.Log(
                 "[GameBootstrap] " + eventSystemObject.name
-                + " を作成しました (StandaloneInputModule)。 / Created the EventSystem with a StandaloneInputModule.");
+                + " を作成しました (" + moduleName + ")。 / Created the EventSystem with a "
+                + moduleName + ".");
         }
 
         /// <summary>

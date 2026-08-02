@@ -25,7 +25,10 @@ What to build — progression, outdoor mechanics, art requirements, safety and p
 ### 2.1 クライアント / Client
 
 - **Unity (C#)** — 既存の `software/README.md` の方針通り。
-- Unity **2022 LTS** を推奨(安定・情報量が多い)。最新の 6000.x 系は避ける。
+- Unity **6 (6000.x 系)** を使用する。当初 2022 LTS を推奨していたが、Unity Hub から 2022 LTS が入手できないため変更した。2022 LTS を選んだ理由は「安定・情報量が多い」だけで必須要件ではなく、本プロジェクトが使う機能(`WebCamTexture`、uGUI、位置情報)はいずれも Unity 6 で利用できる。
+  Unity **6 (the 6000.x line)**. The plan originally recommended 2022 LTS, but it is not obtainable from Unity Hub. That recommendation was only about stability and available documentation, not a hard requirement — everything this project uses (`WebCamTexture`, uGUI, location services) is available in Unity 6.
+- ⚠️ **Player Settings → Active Input Handling は `Both` にする。** Unity 6 の新規プロジェクトは新 Input System が既定だが、そのままだと (1) `StandaloneInputModule` が機能せずボタンが一切反応しない、(2) `Input.location` による位置情報取得が動かない可能性がある。`Both` にすれば両方回避できる。(1) はコード側でも入力モジュールを分岐させて対応済み。
+  ⚠️ **Set Player Settings → Active Input Handling to `Both`.** New Unity 6 projects default to the new Input System only, which would (1) leave every button dead because `StandaloneInputModule` does nothing, and (2) possibly break location reads through `Input.location`. `Both` avoids both. The code also branches on the input module for (1).
 - 対象プラットフォームは **Android を優先**(署名・審査の手間がなく実機での反復が速い)。iOS は後追い。
 - 撮影は Unity 標準の **`WebCamTexture`** で実装する。サードパーティのネイティブカメラプラグインは使わない(後述の「実装時の設計変更」参照)。いずれの方式でもギャラリーから既存写真を取り込む経路は存在せず、屋外担保の効果は同じ。
 - JSONは `Newtonsoft.Json`(Unity Package Manager 経由)を使用。`Card` は非公開フィールド + 読み取り専用プロパティ構成のため、`JsonUtility` ではセーブデータを往復できない。
@@ -158,7 +161,7 @@ Using the Unity Test Framework requires an `.asmdef`, and introducing one hides 
 
 | フェーズ / Phase | 内容 / Deliverables | 規模 / Size |
 | --- | --- | --- |
-| **Phase 0 — 雛形構築** | Unity 2022 LTS プロジェクトを `software/` に作成。`.gitignore` 確認。`Newtonsoft.Json` 導入。シーン生成メニューを実行し、画面遷移だけ通る状態にする。Android実機ビルド確認。 | M |
+| **Phase 0 — 雛形構築** | Unity 6 プロジェクトを `software/` に作成。`Active Input Handling` を `Both` に設定。`Newtonsoft.Json` 導入。シーン生成メニューを実行し、画面遷移だけ通る状態にする。Android実機ビルド確認。 | M |
 | **Phase 1 — 撮影・カード生成** | `WebCamTexture` による撮影、`MockCardGenerator` によるローカル生成、CardResult画面。通信もサーバーも不要なため、当初想定していた外部API依存のリスクは無くなった。 | M |
 | **Phase 2 — コレクション・永続化** | `CardRepository` のローカル保存/読込、Collection画面、CardResultからのコレクション反映。 | S |
 | **Phase 3 — バトルシステム** | `BattleManager`、ダメージ計算、属性相性テーブル、CPU固定デッキ、Battle/Result画面UI。 | M |
@@ -228,9 +231,11 @@ The whole loop must run on a real device with **no network at all**. The on-devi
 5. **撮影画像の向き補正が未実装。** 端末を縦持ちすると `WebCamTexture` は横向きバッファを返すことが多く、保存されるJPEGが横倒しになる可能性が高い。**実機で最初に出る不具合の最有力候補。**
 6. **`captures/` の古い画像を削除していない。** 長期プレイで容量を食う。サムネイルは別途保存しているので、生成後に元画像を消すか、一定数で古いものから削除する。
 7. **セーブデータにスキーマバージョンが無い**(下記 7 参照)。
-8. `Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf")` — Unity のバージョンによって組み込みフォント名が異なる。`Arial.ttf` へのフォールバックを入れてあるが、両方失敗すると文字が出ない。
-9. Android の `Active Input Handling` が「Input System Package (New)」のみだと `StandaloneInputModule` が機能せず、**ボタンが一切反応しない**。
+8. `Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf")` — Unity のバージョンによって組み込みフォント名が異なる。`Arial.ttf` へのフォールバックを入れてあるが、両方失敗すると文字が出ない。Unity 6 では `LegacyRuntime.ttf` が正しい名前。
+9. ✅ 対応済み: `Active Input Handling` が「Input System Package (New)」のみだと `StandaloneInputModule` が機能せずボタンが反応しない問題。`GameBootstrap` が `ENABLE_INPUT_SYSTEM` を見て `InputSystemUIInputModule` を使うよう分岐させた。ただし `Input.location`(位置情報)は分岐で救えないため、**Active Input Handling は `Both` にする**必要がある(2.1 参照)。
 10. シーンにカメラが無い。オーバーレイUIは描画されるが Game ビューに警告が出る。
+11. **Unity 6 での未検証API。** このコードは Unity 2022 LTS 想定で書かれており、Unity 6 で非推奨・削除されたAPIが残っている可能性がある。`FindObjectOfType`(→ `EventSystem.current` に置換済み)以外にも初回コンパイルで出る可能性がある。出たら都度置き換える。
+    **APIs unverified on Unity 6.** This code was written against Unity 2022 LTS, so it may still use APIs that Unity 6 deprecated or removed. `FindObjectOfType` was already replaced with `EventSystem.current`; expect others to surface on the first compile.
 
 ---
 
