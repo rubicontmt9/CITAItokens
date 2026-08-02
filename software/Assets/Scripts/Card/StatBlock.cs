@@ -4,8 +4,8 @@ using UnityEngine;
 namespace CitaiTokens.Cards
 {
     /// <summary>
-    /// カードの戦闘ステータス。AI生成値は必ず <see cref="Clamped"/> を通して正規化する。
-    /// Battle stats for a card. AI-generated values must always be normalized through <see cref="Clamped"/>.
+    /// カードの戦闘ステータス。生成された値は必ず <see cref="Clamped"/> を通して正規化する。
+    /// Battle stats for a card. Generated values must always be normalized through <see cref="Clamped"/>.
     /// </summary>
     [Serializable]
     public struct StatBlock

@@ -262,15 +262,46 @@ The whole loop must run on a real device with **no network at all**. The on-devi
 
 ---
 
-## 8. オンデバイスモデル / On-Device Model (Phase 6)
+## 8. 写真からのステータス導出 / Deriving Stats from the Photo
 
-完成版の生成方式。**MVP の完了条件には含めない。**
+**✅ 方針決定: 案A(学習なしの画像解析)を採用し、最優先で実装する。** MVP の後回しではなく、ここがゲームの核であるため最初の作業単位にした(§12 参照)。
 
-**🔶 実装方針は未決定。** 3案あり、工数が極端に違う:
+**Decided: option A (image analysis without training), implemented first.** This is the core of the game rather than a post-MVP item, so it is the first unit of work (see §12).
+
+### 実装の構成 / Structure
+
+```
+写真(既存のJPEG/PNGでもよい)
+  → PhotoAnalyzer      : 9個の特徴量に還元(色相分布・彩度・明度・コントラスト・
+  │                       エッジ量・エッジ方向の揃い方・暗部の割合)
+  → PhotoStatDeriver   : 特徴量 → 武器ジャンル / 属性 / レアリティ / ステータス
+  → PhotoCardComposer  : 名前とフレーバーを付けて Card を組み立てる
+```
+
+- 反復は **Editor の `Tools → CITAItokens → Card Preview`** で行う。手持ちの写真フォルダを一括解析し、9個の特徴量と結果を並べて表示する。カメラ・権限・シーン・実機のいずれも不要。
+  Iteration happens in the Editor via `Tools → CITAItokens → Card Preview`, which batch-analyses a folder of existing photos and shows all nine features beside the result. No camera, permissions, scene, or device involved.
+- **一括表示が重要。** 「どの写真も同じジャンルになる」という失敗は1枚ずつ見ても気づけず、分布を見ないと分からない。
+  **Batch view matters**: "every photo yields the same genre" is invisible one photo at a time and only shows up in the distribution.
+
+### この方式の限界 / What this approach cannot do
+
+⚠️ **枝の「太さ」や「分岐数」を正確に測るには被写体の切り出し(セグメンテーション)が必要で、これは実装が重い。** 現在の実装は画像全体の統計量を代理指標として使っている:
+
+- エッジ量が多い → 分岐が多い被写体、と解釈する
+- エッジの向きが揃っている → 真っ直ぐな棒、と解釈する
+- 暗部の割合が大きい → 被写体が画面を占めている(=太い)、と解釈する
+
+**背景が写真ごとに違えば代理指標はぶれる。** 草地で撮った枝と、コンクリートで撮った枝では同じ枝でも結果が変わりうる。実際の写真で検証して、許容範囲かを判断する必要がある。許容できない場合の次の手は被写体の切り出しだが、工数は跳ね上がる。
+
+⚠️ These are **proxies, not measurements** — accurate thickness or fork counting needs subject segmentation, which is a much larger job. Because the proxies read the whole frame, the same branch photographed on grass and on concrete can yield different results. This must be validated against real photos; if it is not acceptable, segmentation is the next step, at a significantly higher cost.
+
+### 検討した他の案 / Options considered
+
+3案あり、工数が極端に違う:
 
 | 案 / Option | 内容 | 工数 | 学習データ |
 | --- | --- | --- | --- |
-| **A. 学習なしの画像解析**(推奨) | 平均色・色相分布・エッジ量・明暗差などを自前で計算し、ステータスに写像する | 小 | 不要 |
+| **A. 学習なしの画像解析**(✅ 採用) | 色相分布・エッジ量・明暗差などを自前で計算し、ステータスに写像する | 小 | 不要 |
 | B. 既存の学習済みモデル流用 | 一般物体認識の公開モデル(MobileNet 等)を ONNX で組み込み、分類結果をステータスに写像 | 中 | 不要 |
 | C. 自前で学習 | 写真を集めてラベル付けし、モデルを学習させる | 大 | 数百〜数千枚の収集とアノテーションが必要 |
 
@@ -278,8 +309,8 @@ The whole loop must run on a real device with **no network at all**. The on-devi
 
 Recommended: **option A**. It needs no training data, satisfies the experiential requirement that the photo's appearance drives the result, sits on the same path as deriving the element from colour, and requires neither Sentis nor ONNX. B suits "is this a branch?" but not deriving thickness or texture. C is the most faithful but disproportionately heavy for this project.
 
-- どの案でも `ICardGenerator` の実装を差し替えるだけで済む。撮影・コレクション・バトルの各層は変更不要。
-- 🔶 A を選ぶ場合、Phase 6 は Phase 5 と並行できる(独立した実装のため)。
+- どの案でも `ICardGenerator` の実装を差し替えるだけで済む。撮影・コレクション・バトルの各層は変更不要。この抽象化のおかげで、ハッシュ方式(`MockCardGenerator`)から画像解析方式(`PhotoAnalysisCardGenerator`)への差し替えが設定1つで済む。
+- 将来 B や C に進む場合も、同じ差し替えで済む。A で不足が明確になってから判断する。
 
 ---
 
@@ -329,15 +360,25 @@ MVP の完了条件には含めないが、着手前に把握しておく項目�
 
 実装を再開する際の順序。**依存関係で決まっている部分と、選択の余地がある部分を分けて書く。**
 
+**最優先は「写真 → ステータス」の実装。** ここが面白くなければ他のすべてが無意味になるため、通しプレイより先に着手する。Editor 上のプレビューツールで完結させれば、カメラ・権限・シーン・実機のいずれも不要で高速に反復できる。
+
+**The photo → stats derivation comes first.** If that is not interesting, nothing else matters. It is built behind an Editor preview tool so it can be iterated without a camera, permissions, a scene, or a device.
+
 ```
-[必須・順序固定]
+[第1弾・写真からステータスを振る ← 最優先]
   1. セーブスキーマバージョン導入 (LocalCardRepository)   ← 後から入れると移行が必要
-  2. 武器ジャンルの導入 (Card に WeaponGenre 追加、生成側で補正)
-                                                          ← 1 の後。Card の形が変わるため
-  3. UI/BattleScreen + UI/ResultScreen 作成               ← 無いとコンパイル不可
-  4. Unity プロジェクト作成 + Newtonsoft 導入 (人力)
-  5. Create Main Scene → 初回コンパイル → エラー修正      ← ここが最初の実質的な検証
-  6. Editor 上で通しプレイ (PCのWebカメラ、モック生成)
+  2. 武器ジャンルの導入 (Card に WeaponGenre 追加)
+  3. 写真の特徴量抽出 (PhotoAnalyzer)                     ← 色相分布・エッジ量・方向・明暗
+  4. 特徴量 → ジャンル/属性/レアリティ/ステータス (PhotoStatDeriver)
+  5. Editor プレビューツール (Tools → CITAItokens → Card Preview)
+                                                          ← 手持ちの写真フォルダを一括解析
+  6. 実際の棒の写真で反復調整                             ← ここが本番。実機不要
+
+[第2弾・通しプレイを成立させる]
+  7. UI/BattleScreen + UI/ResultScreen 作成               ← 無いとコンパイル不可
+  8. Unity プロジェクト作成 + Newtonsoft 導入 (人力)
+  9. Create Main Scene → 初回コンパイル → エラー修正      ← 最初の実質的な検証
+ 10. Editor 上で通しプレイ (PCのWebカメラ)
 
 [必須・5以降ならいつでも]
   7. 撮影画像の向き補正                                    ← 実機で最初に出る不具合の本命
