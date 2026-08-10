@@ -229,8 +229,8 @@ The whole loop must run on a real device with **no network at all**. The on-devi
 4. 初回コンパイルで出るエラーの修正。各エージェントが「自信がない」と申告したAPIが候補(下記)。
 
 **既知の課題 / Known issues:**
-5. **撮影画像の向き補正が未実装。** 端末を縦持ちすると `WebCamTexture` は横向きバッファを返すことが多く、保存されるJPEGが横倒しになる可能性が高い。**実機で最初に出る不具合の最有力候補。**
-6. **`captures/` の古い画像を削除していない。** 長期プレイで容量を食う。サムネイルは別途保存しているので、生成後に元画像を消すか、一定数で古いものから削除する。
+5. ✅ 実装済み(**未検証**): 撮影画像の向き補正。JPEG化の前に画素そのものを回転させる。参照実装との突き合わせ(4角度 × ミラー有無 × 6種のアスペクト比)で演算の一致は確認したが、**`videoRotationAngle` を時計回りと解釈してよいかは実機でしか確かめられない**。誤っていれば上下逆さまになる。Editor では PCカメラが `angle=0` を返すため回転の分岐が実行されず、検証にならない。切り分け表は `android-testing.md` 4.1。
+6. ✅ 実装済み: `captures/` の自動削除。直近20件を残し、撮影成功後に古いものから削除する。即時削除にしないのは、サムネイル書き込み前に消すと撮ったばかりの写真を失うため。
 7. **セーブデータにスキーマバージョンが無い**(下記 7 参照)。
 8. `Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf")` — Unity のバージョンによって組み込みフォント名が異なる。`Arial.ttf` へのフォールバックを入れてあるが、両方失敗すると文字が出ない。Unity 6 では `LegacyRuntime.ttf` が正しい名前。
 9. ✅ 対応済み: `Active Input Handling` が「Input System Package (New)」のみだと `StandaloneInputModule` が機能せずボタンが反応しない問題。`GameBootstrap` が `ENABLE_INPUT_SYSTEM` を見て `InputSystemUIInputModule` を使うよう分岐させた。ただし `Input.location`(位置情報)は分岐で救えないため、**Active Input Handling は `Both` にする**必要がある(2.1 参照)。

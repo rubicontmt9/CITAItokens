@@ -125,10 +125,41 @@ Replace `<pkg>` with the package name you set in Player Settings.
    adb shell run-as <pkg> ls files/captures/
    adb exec-out run-as <pkg> cat files/captures/<ファイル名>.jpg > out.jpg
    ```
-3. PC で開いて向きを確認する。横倒しなら向き補正の実装が必要。
+3. PC で開いて向きを確認する。
 4. 同時に**カードのサムネイル**(`cards/`)も確認する。プレビュー画面が正しく見えていても保存画像が回っていることがあるため、**画面の見た目ではなく保存されたファイルで判定してください。**
 
 **Judge from the saved file, not from what the preview looked like** — the preview can be corrected while the stored JPEG is not.
+
+#### 必ずログを併せて読む / Always read the log alongside
+
+補正処理は撮影のたびに以下を出します。**これが無いと「補正が間違っている」のか「そもそも回転情報が来ていない」のか区別できません。**
+
+The correction logs the following on every capture. **Without it you cannot tell "the correction is wrong" from "the device never reported a rotation".**
+
+```
+[WebCamPhotoCapture] 向き補正 / Orientation correction: angle=90 mirrored=False size 1280x720 -> 720x1280
+```
+
+#### 症状から原因を切り分ける / Diagnosing from the symptom
+
+| 症状 / Symptom | 原因 / Likely cause |
+| --- | --- |
+| ログが `angle=0` なのに横倒し | 端末が回転情報を返していない。インデックス演算の問題ではないので、別の判定材料(端末の向きセンサー)が必要 |
+| 90° 横倒し | 角度の扱いが逆になっている可能性 |
+| **上下逆さま** | 回転方向の解釈が逆。`videoRotationAngle` を時計回りと解釈しているが、逆の規約かもしれない — **最も可能性が高い誤り** |
+| **文字が鏡像になる** | ミラー処理の有無、または回転との適用順が誤り |
+| 0°/180° は正しいが 90°/270° で崩れる | 幅と高さの入れ替えの問題 |
+
+⚠️ **Unity Editor では検証できません。** PCのWebカメラは通常 `angle=0` / `mirrored=false` を返すため、回転の分岐が一度も実行されません。ログに `angle=0` と出るだけで、何も確かめたことになりません。
+
+⚠️ **The Editor cannot verify this.** A desktop webcam normally reports `angle=0` / `mirrored=false`, so the rotation branches never execute — the log simply says `angle=0` and nothing has been proven.
+
+#### 追加で試すこと / Also try
+
+- **フロントカメラ**と**端末を横持ち**でも撮る。`mirrored == true` と 270° の分岐は、ここで初めて出てくる可能性が高い。
+  Shoot with the **front camera** and **holding the device in landscape** — that is where `mirrored == true` and the 270° branch are most likely to appear.
+- サムネイルが**二重に回転していない**か確認する。`ThumbnailStore` は縮小するだけで回転しないため、元画像と同じ向きになるはず。
+  Check the thumbnail is **not double-rotated**: `ThumbnailStore` only downscales and never rotates, so it should match the original's orientation.
 
 ### 4.2 権限拒否の経路 / Permission denial path
 
@@ -179,7 +210,17 @@ Play the whole loop in **airplane mode**. Local generation means no network is n
 adb shell du -sh /sdcard/Android/data/<pkg>/files/
 ```
 
-`captures/` に元画像が溜まり続ける既知の課題(削除処理が未実装)の実測に使えます。20〜30枚撮ってから測ると増加ペースが分かります。
+**自動削除の確認**: 元画像は直近20件だけ残す実装になっています。25枚撮ってから件数を数えてください。
+
+Pruning keeps only the 20 most recent originals. Take 25 photos, then count:
+
+```sh
+adb shell ls /sdcard/Android/data/<pkg>/files/captures/ | wc -l   # → 20 になるはず
+```
+
+logcat に `[CaptureFileStore] 古い撮影画像を整理しました` が出ていれば削除が動いています。カードのサムネイル(`cards/`)は別管理なので削除されません。
+
+If logcat shows `[CaptureFileStore] 古い撮影画像を整理しました`, pruning ran. Card thumbnails in `cards/` are managed separately and are never pruned.
 
 ---
 
