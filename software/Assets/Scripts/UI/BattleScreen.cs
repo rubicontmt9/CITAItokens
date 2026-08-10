@@ -117,9 +117,9 @@ namespace CitaiTokens.UI
 
         /// <summary>
         /// UIを1度だけ組み立てる。<see cref="ScreenRouter"/> は自身の Awake で画面を無効化するため、
-        /// 組み立ては <see cref="Awake"/> ではなく最初の <see cref="OnShow"/> で行う。
+        /// 組み立ては Awake ではなく最初の <see cref="OnShow"/> で行う。
         /// Builds the UI exactly once. <see cref="ScreenRouter"/> deactivates screens from its own Awake, so the
-        /// widgets are built on the first <see cref="OnShow"/> rather than in <see cref="Awake"/>.
+        /// widgets are built on the first <see cref="OnShow"/> rather than in Awake.
         /// </summary>
         private void Build()
         {
