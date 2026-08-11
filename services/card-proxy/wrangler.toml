@@ -1,0 +1,14 @@
+name = "card-proxy"
+main = "src/index.ts"
+compatibility_date = "2026-07-30"
+
+# ANTHROPIC_API_KEY は Wrangler の secret として設定します。このファイルには絶対に書かないこと。
+# ANTHROPIC_API_KEY is set as a Wrangler secret. NEVER write it into this file:
+#
+#   npx wrangler secret put ANTHROPIC_API_KEY
+#
+# ローカル開発では `.dev.vars` を使います (git-ignore 済み)。
+# For local development, use `.dev.vars` instead (git-ignored). See `.dev.vars.example`.
+#
+# [vars] にキーを置くとリポジトリにコミットされてしまうため、ここには何も置きません。
+# Anything under [vars] is committed to the repository, so no credentials belong there.

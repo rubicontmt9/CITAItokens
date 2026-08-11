@@ -1,0 +1,11 @@
+# このファイルをコピーして `.dev.vars` を作り、実際のキーを入れてください。
+# Copy this file to `.dev.vars` and put your real key in it.
+#
+#   cp .dev.vars.example .dev.vars
+#
+# `.dev.vars` は .gitignore 済みです。APIキーは絶対にコミットしないこと。
+# `.dev.vars` is git-ignored. NEVER commit an API key to this repository.
+# `.dev.vars` はローカルの `npm run dev` 専用です。本番は `npx wrangler secret put ANTHROPIC_API_KEY`。
+# `.dev.vars` is only for local `npm run dev`; production uses `npx wrangler secret put ANTHROPIC_API_KEY`.
+
+ANTHROPIC_API_KEY=sk-ant-...
