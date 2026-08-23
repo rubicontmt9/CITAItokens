@@ -1,30 +1,30 @@
-# hardware/ — 専用ハードウェア設計 / Custom Hardware Design
+# hardware/ — カスタムPCB設計 / Custom Hardware Design
 
-ゲーム専用の自作PCB(基板)設計一式を格納します。設計ツールは KiCad を想定しています。
-This directory holds the custom PCB (circuit board) design for the game's dedicated hardware, designed using KiCad.
+**PersonaSticker(モノに人格を与えるステッカー)** のカスタムPCB(基板)設計一式を格納します。設計ツールは KiCad を想定しています(使用バージョンは着手時にここへ明記)。
+This directory holds the custom PCB design for PersonaSticker, designed using KiCad (note the KiCad version here once decided).
+
+設計の前提・BOM・電力収支・PCB化方針は **[docs/planning/03_hardware_design.md](../docs/planning/03_hardware_design.md)** を参照してください。
+See **[docs/planning/03_hardware_design.md](../docs/planning/03_hardware_design.md)** for design assumptions, BOM, power budget, and the custom-PCB plan.
 
 ## フォルダ構成 / Layout
 
 ```
 hardware/
 ├── schematic/  # 回路図 (KiCad .kicad_sch など) / Schematic files
-├── pcb/        # 基板レイアウト (KiCad .kicad_pcb など) / PCB layout files
-├── bom/        # 部品表 (BOM) / Bill of materials
+├── pcb/        # 基板レイアウト (.kicad_pcb)。製造データは pcb/gerbers/ へ
+├── bom/        # 部品表 (BOM, CSV) / Bill of materials
 └── README.md   # このファイル / This file
 ```
 
-## セットアップ手順 / Setup
+## フェーズ / Phasing
 
-1. KiCad で新規プロジェクトを作成し、`schematic/` に回路図、`pcb/` に基板レイアウトを配置してください。
-   Create a new KiCad project and place schematics under `schematic/` and PCB layout under `pcb/`.
-2. 部品表(BOM)は `bom/` に CSV などの形式で保存してください。
-   Save the bill of materials (BOM) under `bom/`, e.g. as CSV.
-3. 製造用データ(ガーバーファイル等)を出力する場合は `pcb/gerbers/` のようなサブフォルダにまとめてください。
-   When exporting manufacturing data (e.g. Gerber files), group it under a subfolder such as `pcb/gerbers/`.
-4. 使用する KiCad のバージョンが決まったらこの README に明記してください。
-   Once the KiCad version in use is decided, note it here.
+- **Phase 1〜3**: 市販の開発ボード(Seeed XIAO ESP32S3)+ モジュールで試作。**このフォルダはまだ使いません**
+- **Phase 4**: 仕様確定後、KiCadでカスタムPCBを設計(ESP32-S3-WROOM-1 直載せ、FPC直結電子ペーパー、薄型LiPo。目標 55×45mm・厚10mm以下)
 
-## ソフトウェア連携 / Software Integration
+ロードマップ: [docs/planning/05_roadmap.md](../docs/planning/05_roadmap.md)
 
-ゲーム本体 (`software/`) との通信インターフェース(シリアル通信のピン配置・プロトコルなど)は、仕様が固まり次第このファイルに追記します。
-The communication interface with the game (`software/`) — e.g. serial pinout and protocol — will be documented here once the spec is finalized.
+## 設計ルール / Notes
+
+- 無線モジュールは**技適取得済みの ESP32-S3-WROOM-1** を使用する(アンテナは自作しない)
+- 製造用データ(ガーバー等)は `pcb/gerbers/` にまとめて出力する
+- ファームウェア側(`software/firmware/`)とのピン割当は planning ドキュメントの表を正とし、変更時は両方を更新する

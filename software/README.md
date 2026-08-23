@@ -1,34 +1,30 @@
-# software/ — ゲームソフトウェア / Game Software
+# software/ — ファームウェア + Web UI / Firmware + Web UI
 
-Unity (C#) で開発するゲーム本体を格納します。
-This directory holds the Unity (C#) based game.
+**PersonaSticker(モノに人格を与えるステッカー)** のソフトウェア一式を格納します。
+This directory holds the software for PersonaSticker.
+
+設計の詳細は **[docs/planning/04_firmware_design.md](../docs/planning/04_firmware_design.md)** を参照してください。
+See **[docs/planning/04_firmware_design.md](../docs/planning/04_firmware_design.md)** for the design details.
 
 ## 想定構成 / Expected Layout
 
-Unity Editor でプロジェクトを新規作成すると、以下のようなフォルダがこの直下に生成されます。
-When a new project is created in the Unity Editor, folders like the following will be generated directly under this directory.
-
 ```
 software/
-├── Assets/           # スクリプト・シーン・素材など / Scripts, scenes, assets
-│   ├── Scripts/
-│   ├── Scenes/
-│   └── ...
-├── Packages/         # パッケージ依存関係 / Package dependencies
-├── ProjectSettings/  # プロジェクト設定 / Project settings
-└── README.md         # このファイル / This file
+├── firmware/           # PlatformIO プロジェクト (ESP32-S3 / Arduino framework)
+│   ├── platformio.ini
+│   ├── src/            # sensors / emotion_engine / display / mesh_net / web_ui / power_mgr
+│   ├── data/           # Web UI アセット (LittleFS: HTML/JS/CSS)
+│   └── test/           # 感情エンジンのネイティブユニットテスト
+└── README.md           # このファイル / This file
 ```
 
-## セットアップ手順 / Setup
+## 方針 / Notes
 
-1. Unity Hub で本フォルダ (`software/`) を既存プロジェクトとして開く、または新規プロジェクトを作成しこの場所に配置してください。
-   Open this folder (`software/`) as an existing project in Unity Hub, or create a new project and place it here.
-2. 使用する Unity バージョンはプロジェクト作成後に `ProjectSettings/ProjectVersion.txt` に記録されます。バージョンが決まったらこの README にも明記してください。
-   The Unity version in use will be recorded in `ProjectSettings/ProjectVersion.txt` once the project is created. Note it here once decided.
-3. `Assets/Scripts/` 配下は機能単位でサブフォルダを分けることを推奨します(例: `Player/`, `Hardware/`, `UI/`)。
-   Under `Assets/Scripts/`, organize by feature into subfolders (e.g. `Player/`, `Hardware/`, `UI/`).
+- **開発環境**: PlatformIO + Arduino framework(主要ライブラリ: painlessMesh, GxEPD2, ESPAsyncWebServer, ArduinoJson ほか)
+- **ノードとゲートウェイは同一ファームウェア**で、ビルドフラグ / NVS設定で役割を切替えます
+- **感情エンジンは純粋ロジックとして分離**し、PC上でネイティブユニットテストを実行できるようにします
+- Wi-Fi認証情報などの秘密情報はNVSに保存し、**リポジトリにはコミットしません**
+- スマホからの確認・設定は、ゲートウェイが配信するWeb UI(`http://persona.local`)で行います(専用アプリなし)
 
-## ハードウェア連携 / Hardware Integration
-
-`hardware/` の自作PCBと通信する処理は `Assets/Scripts/Hardware/` のようなフォルダにまとめ、通信プロトコルが決まり次第ここに追記します。
-Code communicating with the custom PCB in `hardware/` should be grouped under a folder such as `Assets/Scripts/Hardware/`; the communication protocol will be documented here once finalized.
+セットアップ手順は Phase 1 でPlatformIOプロジェクトを作成した際にここへ追記します。
+Setup instructions will be added here when the PlatformIO project is created in Phase 1.
