@@ -107,9 +107,9 @@ stateDiagram-v2
 | メソッド | パス | 内容 |
 | --- | --- | --- |
 | GET | `/api/stickers` | 全ステッカーの最新状態一覧 |
-| GET | `/api/stickers/{id}` | 個別詳細(センサー履歴含む) |
-| PUT | `/api/stickers/{id}/config` | 名前・性格・閾値・報告間隔の変更(rev++) |
-| GET | `/api/system` | メッシュ状態、ゲートウェイ情報 |
+| POST | `/api/config` | 名前・性格・閾値・報告間隔の変更(body内の`id`で対象指定、rev++) |
+| GET | `/api/system` | 稼働時間・IP・ヒープ等のゲートウェイ情報 |
+| WS | `/ws` | 新しい報告のリアルタイムプッシュ |
 
 - 初回セットアップ: ゲートウェイが未設定時はAPモード(`PersonaSticker-Setup`)で起動し、スマホから接続してルーターのSSID/パスワードを入力するキャプティブポータル方式
 

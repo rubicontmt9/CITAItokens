@@ -1,29 +1,10 @@
-# ==== Unity (software/) ====
-software/[Ll]ibrary/
-software/[Tt]emp/
-software/[Oo]bj/
-software/[Bb]uild/
-software/[Bb]uilds/
-software/[Ll]ogs/
-software/[Uu]serSettings/
-software/[Mm]emoryCaptures/
-software/[Rr]ecordings/
-software/.vs/
-software/.vscode/
-*.csproj
-*.sln
-*.user
-*.unityproj
-*.tmp
-*.pidb
-*.booproj
-*.svd
-*.pdb
-*.mdb
-*.opendb
-*.VC.db
-software/*/Assets/AssetStoreTools*
-crashlytics-build.properties
+# ==== PlatformIO (software/firmware/) ====
+software/firmware/.pio/
+software/firmware/.vscode/
+
+# ==== シミュレーター (software/simulator/) ====
+software/simulator/persona_sim
+software/simulator/*.o
 
 # ==== KiCad (hardware/) ====
 hardware/**/*-bak

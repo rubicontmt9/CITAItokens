@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PersonaSticker シミュレーター</title>
+<style>
+  :root {
+    --bg: #f2f0ea;
+    --card: #ffffff;
+    --ink: #2b2a26;
+    --muted: #8a877e;
+    --line: #dedbd2;
+    --accent: #3a6ea5;
+    --paper: #ece9e0;
+    --paper-ink: #23221f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+  }
+  header {
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    padding: 12px 20px;
+    background: var(--card);
+    border-bottom: 1px solid var(--line);
+    position: sticky; top: 0; z-index: 5;
+  }
+  header h1 { font-size: 16px; margin: 0; }
+  header .clock { font-variant-numeric: tabular-nums; color: var(--muted); }
+  header .spacer { flex: 1; }
+  select, input[type=text], button {
+    font: inherit; font-size: 13px;
+    padding: 5px 8px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: #fff; color: var(--ink);
+  }
+  button { cursor: pointer; }
+  button:hover { border-color: var(--accent); color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary:hover { opacity: .9; }
+
+  main {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(460px, 1fr));
+    gap: 16px;
+    padding: 16px 20px 40px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 14px;
+    display: grid;
+    grid-template-columns: 216px 1fr;
+    gap: 14px;
+  }
+  .card h2 { font-size: 14px; margin: 0 0 4px; display: flex; gap: 8px; align-items: baseline; }
+  .card h2 .face-jp { color: var(--accent); font-size: 13px; }
+  .epd {
+    width: 200px; height: 200px;
+    background: var(--paper);
+    border: 6px solid #b9b5a9;
+    border-radius: 4px;
+    image-rendering: pixelated;
+  }
+  .left { display: flex; flex-direction: column; gap: 8px; align-items: center; }
+  .stats { font-size: 12px; color: var(--muted); line-height: 1.7; width: 100%; }
+  .stats b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .va-wrap { display: flex; gap: 6px; align-items: center; }
+  .va { background: #fafaf7; border: 1px solid var(--line); border-radius: 6px; }
+  .va-label { font-size: 10px; color: var(--muted); writing-mode: vertical-rl; }
+
+  .controls { display: flex; flex-direction: column; gap: 10px; font-size: 13px; }
+  .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .row label { min-width: 4.5em; color: var(--muted); font-size: 12px; }
+  .row output { min-width: 4.5em; font-variant-numeric: tabular-nums; font-size: 12px; }
+  input[type=range] { flex: 1; accent-color: var(--accent); min-width: 100px; }
+  fieldset {
+    border: 1px solid var(--line); border-radius: 8px;
+    padding: 8px 10px 10px; margin: 0;
+  }
+  legend { font-size: 11px; color: var(--muted); padding: 0 4px; }
+  .btns button { font-size: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🏷️ PersonaSticker シミュレーター</h1>
+  <span class="clock" id="clock">--</span>
+  <label style="font-size:12px;color:var(--muted)">時間加速
+    <select id="accel">
+      <option value="1">×1(実時間)</option>
+      <option value="10">×10</option>
+      <option value="60" selected>×60(1秒=1分)</option>
+      <option value="600">×600</option>
+      <option value="3600">×3600(1秒=1時間)</option>
+    </select>
+  </label>
+  <span class="spacer"></span>
+  <button id="add" class="primary">+ ステッカー追加</button>
+</header>
+<main id="cards"></main>
+
+<script>
+"use strict";
+
+const FACE_JP = {
+  happy: "うれしい 😊", content: "おだやか 🙂", sleepy: "ねむい 😴",
+  cold: "さむい 🥶", hot: "あつい 🥵", surprised: "びっくり 😲",
+  scared: "こわい 😨", lonely: "さみしい 🥺", hungry: "おなかすいた 🍽️",
+};
+const TEMPERAMENT_JP = { cheerful: "ほがらか", shy: "こわがり", calm: "おっとり" };
+
+const cards = new Map();  // id -> {el, seq, refs}
+
+async function api(path, body) {
+  const opt = body ? { method: "POST", body: JSON.stringify(body) } : {};
+  const res = await fetch(path, opt);
+  return res.json();
+}
+
+function el(tag, attrs = {}, ...children) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") e.className = v;
+    else if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
+    else e.setAttribute(k, v);
+  }
+  for (const c of children) e.append(c);
+  return e;
+}
+
+// base64 → 1bppビットマップをcanvasへ描画(1=黒)
+function drawFrame(canvas, bitsB64, w, h) {
+  const raw = atob(bitsB64);
+  const ctx = canvas.getContext("2d");
+  const img = ctx.createImageData(w, h);
+  const stride = w >> 3;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const black = (raw.charCodeAt(y * stride + (x >> 3)) >> (7 - (x & 7))) & 1;
+      const i = (y * w + x) * 4;
+      if (black) { img.data[i] = 0x23; img.data[i+1] = 0x22; img.data[i+2] = 0x1f; }
+      else       { img.data[i] = 0xec; img.data[i+1] = 0xe9; img.data[i+2] = 0xe0; }
+      img.data[i+3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
+function drawVA(canvas, v, a) {
+  const ctx = canvas.getContext("2d");
+  const s = canvas.width;
+  ctx.clearRect(0, 0, s, s);
+  ctx.strokeStyle = "#d5d2c8";
+  ctx.beginPath();
+  ctx.moveTo(s/2, 2); ctx.lineTo(s/2, s-2);
+  ctx.moveTo(2, s/2); ctx.lineTo(s-2, s/2);
+  ctx.stroke();
+  ctx.fillStyle = "#8a877e";
+  ctx.font = "9px sans-serif";
+  ctx.fillText("快", s-12, s/2 - 4);
+  ctx.fillText("不快", 2, s/2 - 4);
+  ctx.fillText("覚醒", s/2 + 3, 10);
+  ctx.fillText("鎮静", s/2 + 3, s - 4);
+  const x = s/2 + v * (s/2 - 8);
+  const y = s/2 - a * (s/2 - 8);
+  ctx.fillStyle = "#3a6ea5";
+  ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2); ctx.fill();
+}
+
+function slider(labelText, min, max, step, value, unit, onchange) {
+  const out = el("output", {}, `${value}${unit}`);
+  const input = el("input", {
+    type: "range", min, max, step, value,
+    oninput: () => { out.textContent = `${input.value}${unit}`; },
+    onchange: () => onchange(parseFloat(input.value)),
+  });
+  const row = el("div", { class: "row" }, el("label", {}, labelText), input, out);
+  return { row, input, out };
+}
+
+function makeCard(st) {
+  const canvas = el("canvas", { class: "epd", width: 200, height: 200 });
+  const va = el("canvas", { class: "va", width: 96, height: 96 });
+  const title = el("h2", {}, el("span", { class: "name" }, st.name), el("span", { class: "face-jp" }, ""));
+  const stats = el("div", { class: "stats" });
+
+  const post = (action, body) => api(`/api/stickers/${st.id}/${action}`, body);
+
+  // --- 環境操作 ---
+  const sTemp = slider("温度", -15, 45, 0.5, st.env.temp_c, "°C", v => post("env", { temp_c: v }));
+  const sHum = slider("湿度", 0, 100, 1, st.env.hum_pct, "%", v => post("env", { hum_pct: v }));
+  const sLux = slider("照度", 0, 1000, 5, st.env.lux_manual, "lx", v => post("env", { lux: v, lux_auto: false }));
+  const luxAuto = el("input", {
+    type: "checkbox",
+    onchange: () => post("env", { lux_auto: luxAuto.checked }),
+  });
+  luxAuto.checked = st.env.lux_auto;
+  sLux.row.append(el("label", { style: "min-width:auto" }, luxAuto, " 昼夜自動"));
+
+  const btns = el("div", { class: "row btns" },
+    el("button", { onclick: () => post("shake", { strength: 0.3 }) }, "なでる"),
+    el("button", { onclick: () => post("shake", { strength: 1.6 }) }, "衝撃!"),
+    el("button", { onclick: () => post("shake", { strength: 1.6, sustained: true }) }, "ゆらし続ける"),
+  );
+
+  // --- 性格・設定 ---
+  const nameIn = el("input", { type: "text", value: st.name, maxlength: 20, size: 10 });
+  const sensIn = el("input", { type: "range", min: 0, max: 1, step: 0.05, value: st.sensitivity, style: "width:90px" });
+  const tempSel = el("select", {},
+    ...Object.entries(TEMPERAMENT_JP).map(([k, jp]) => {
+      const o = el("option", { value: k }, jp);
+      if (k === st.temperament) o.selected = true;
+      return o;
+    }));
+  const intSel = el("select", {},
+    ...[10, 30, 60, 120, 300].map(v => {
+      const o = el("option", { value: v }, `${v}秒`);
+      if (v === st.report_interval_s) o.selected = true;
+      return o;
+    }));
+  const applyBtn = el("button", {
+    class: "primary",
+    onclick: () => post("config", {
+      name: nameIn.value,
+      sensitivity: parseFloat(sensIn.value),
+      temperament: tempSel.value,
+      report_interval_s: parseInt(intSel.value, 10),
+    }),
+  }, "適用");
+
+  const presetSel = el("select", {},
+    el("option", { value: "" }, "プリセット…"),
+    el("option", { value: "fridge" }, "🧊 冷蔵庫"),
+    el("option", { value: "plant" }, "🪴 観葉植物"),
+    el("option", { value: "guitar" }, "🎸 ギターケース"),
+  );
+  presetSel.addEventListener("change", () => {
+    if (presetSel.value) post("preset", { preset: presetSel.value });
+    presetSel.value = "";
+  });
+
+  const card = el("div", { class: "card" },
+    el("div", { class: "left" },
+      canvas,
+      el("div", { class: "va-wrap" }, va, stats),
+    ),
+    el("div", { class: "controls" },
+      title,
+      el("fieldset", {}, el("legend", {}, "環境(センサー入力)"), sTemp.row, sHum.row, sLux.row, btns),
+      el("fieldset", {}, el("legend", {}, "性格・設定"),
+        el("div", { class: "row" }, el("label", {}, "名前"), nameIn, presetSel),
+        el("div", { class: "row" }, el("label", {}, "敏感さ"), sensIn, el("label", {}, "気質"), tempSel),
+        el("div", { class: "row" }, el("label", {}, "起床周期"), intSel, applyBtn),
+      ),
+    ),
+  );
+
+  return {
+    el: card, seq: -1,
+    refs: { canvas, va, title, stats, sTemp, sHum, sLux, luxAuto, nameIn },
+  };
+}
+
+function updateCard(c, st) {
+  const r = c.refs;
+  r.title.querySelector(".name").textContent = st.name;
+  r.title.querySelector(".face-jp").textContent = FACE_JP[st.face] || st.face;
+  r.stats.innerHTML =
+    `表情: <b>${FACE_JP[st.face] || st.face}</b><br>` +
+    `快: <b>${st.valence.toFixed(2)}</b> / 覚醒: <b>${st.arousal.toFixed(2)}</b><br>` +
+    `温度 <b>${st.temp_c.toFixed(1)}°C</b> 照度 <b>${Math.round(st.lux)}lx</b><br>` +
+    `放置 <b>${st.idle_hours.toFixed(1)}h</b> 電池 <b>${st.battery_pct.toFixed(0)}%</b><br>` +
+    `起床 <b>${st.wake_count}回</b>(次まで${Math.round(st.next_wake_in)}s)`;
+  drawVA(r.va, st.valence, st.arousal);
+
+  // 操作中でなければスライダーを実態に同期
+  if (document.activeElement !== r.sLux.input && st.env.lux_auto) {
+    r.sLux.input.value = Math.round(st.lux);
+    r.sLux.out.textContent = `${Math.round(st.lux)}lx`;
+  }
+  r.luxAuto.checked = st.env.lux_auto;
+
+  if (st.frame_seq !== c.seq) {
+    c.seq = st.frame_seq;
+    api(`/api/stickers/${st.id}/frame`).then(f => drawFrame(r.canvas, f.bits, f.w, f.h));
+  }
+}
+
+async function poll() {
+  try {
+    const data = await api("/api/stickers");
+    document.getElementById("clock").textContent =
+      `🕒 ${data.sim_clock}(仮想時刻 ×${data.accel})`;
+    const seen = new Set();
+    for (const st of data.stickers) {
+      seen.add(st.id);
+      let c = cards.get(st.id);
+      if (!c) {
+        c = makeCard(st);
+        cards.set(st.id, c);
+        document.getElementById("cards").append(c.el);
+      }
+      updateCard(c, st);
+    }
+    for (const [id, c] of cards) {
+      if (!seen.has(id)) { c.el.remove(); cards.delete(id); }
+    }
+  } catch (e) { /* サーバー停止中は静かに待つ */ }
+}
+
+document.getElementById("accel").addEventListener("change", ev => {
+  api("/api/time", { accel: parseFloat(ev.target.value) });
+});
+document.getElementById("add").addEventListener("click", () => {
+  const name = prompt("ステッカーの名前(英数字)", "NEW");
+  if (name) api("/api/stickers", { name });
+});
+
+setInterval(poll, 600);
+poll();
+</script>
+</body>
+</html>

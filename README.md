@@ -17,8 +17,11 @@ CITAItokens/
 ├── docs/
 │   └── planning/   # プランニングドキュメント(要求仕様〜ロードマップ)
 │                   # Planning documents (requirements → roadmap)
-├── software/       # ファームウェア (PlatformIO / ESP32-S3) + Web UI
-│                   # Firmware (PlatformIO / ESP32-S3) + Web UI
+├── software/
+│   ├── firmware/   # ファームウェア (PlatformIO / ESP32-S3) + Web UI
+│   │               # Firmware (PlatformIO / ESP32-S3) + Web UI
+│   └── simulator/  # PCシミュレーター(ブラウザで仮想ステッカーを操作)
+│                   # PC simulator (drive virtual stickers from the browser)
 ├── hardware/       # カスタムPCB設計 (KiCad)
 │                   # Custom PCB design (KiCad)
 └── README.md       # この案内ファイル / This guide file
@@ -50,8 +53,10 @@ CITAItokens/
 ## 📌 ステータス / Status(ロードマップ: [05_roadmap.md](./docs/planning/05_roadmap.md))
 
 - [x] Phase 0: プランニングドキュメント / Planning documents
-- [ ] Phase 1: 単体試作(センサー→感情→表情表示)/ Single-node prototype
-- [ ] Phase 2: メッシュ + ゲートウェイ + Webアプリ / Mesh + gateway + web app
+- [x] ファームウェア実装(Phase 1+2相当、実機未検証)/ Firmware written (not yet verified on hardware)
+- [x] PCシミュレーター(共有コアをブラウザで操作)/ PC simulator ([software/simulator/](./software/simulator/README.md))
+- [ ] Phase 1: 単体試作(部品調達・実機での動作確認)/ Single-node prototype on real hardware
+- [ ] Phase 2: メッシュ + ゲートウェイ + Webアプリの実機検証 / Mesh + gateway + web app on real hardware
 - [ ] Phase 3: 電力最適化(電池2週間)/ Power optimization
 - [ ] Phase 4: カスタムPCB + ステッカー筐体 / Custom PCB + sticker enclosure
 - [ ] Phase 5: クラウド連携(任意)/ Cloud connectivity (optional)

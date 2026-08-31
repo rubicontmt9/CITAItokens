@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PersonaSticker</title>
+<style>
+  :root {
+    --bg: #f2f0ea; --card: #fff; --ink: #2b2a26; --muted: #8a877e;
+    --line: #dedbd2; --accent: #3a6ea5;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
+  }
+  header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 16px; background: var(--card);
+    border-bottom: 1px solid var(--line);
+    position: sticky; top: 0;
+  }
+  header h1 { font-size: 16px; margin: 0; flex: 1; }
+  header .sys { font-size: 11px; color: var(--muted); text-align: right; }
+  main { padding: 12px; display: grid; gap: 12px; max-width: 560px; margin: 0 auto; }
+  .card {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 14px;
+  }
+  .head { display: flex; align-items: center; gap: 12px; }
+  .emoji { font-size: 44px; line-height: 1; }
+  .head .name { font-size: 16px; font-weight: 600; }
+  .head .face { color: var(--accent); font-size: 13px; }
+  .head .seen { margin-left: auto; font-size: 11px; color: var(--muted); }
+  .metrics {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 6px; margin-top: 10px; font-size: 11px; color: var(--muted);
+    text-align: center;
+  }
+  .metrics b { display: block; font-size: 14px; color: var(--ink); font-variant-numeric: tabular-nums; }
+  details { margin-top: 10px; }
+  summary { font-size: 12px; color: var(--muted); cursor: pointer; }
+  .form { display: grid; gap: 8px; margin-top: 10px; font-size: 13px; }
+  .row { display: flex; align-items: center; gap: 8px; }
+  .row label { min-width: 4.5em; color: var(--muted); font-size: 12px; }
+  input, select, button {
+    font: inherit; font-size: 13px; padding: 6px 8px;
+    border: 1px solid var(--line); border-radius: 6px; background: #fff;
+  }
+  input[type=range] { flex: 1; accent-color: var(--accent); padding: 0; border: 0; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .empty { text-align: center; color: var(--muted); padding: 40px 0; font-size: 13px; }
+  .stale { opacity: .55; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🏷️ PersonaSticker</h1>
+  <div class="sys" id="sys">--</div>
+</header>
+<main id="cards"><div class="empty">ステッカーからの報告を待っています…</div></main>
+
+<script>
+"use strict";
+
+const FACE = {
+  happy: ["😊", "うれしい"], content: ["🙂", "おだやか"], sleepy: ["😴", "ねむい"],
+  cold: ["🥶", "さむい"], hot: ["🥵", "あつい"], surprised: ["😲", "びっくり"],
+  scared: ["😨", "こわい"], lonely: ["🥺", "さみしい"], hungry: ["🪫", "おなかすいた"],
+};
+const TEMPERAMENT = { cheerful: "ほがらか", shy: "こわがり", calm: "おっとり" };
+
+const cards = new Map();
+
+function el(tag, attrs = {}, ...children) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") e.className = v;
+    else if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
+    else e.setAttribute(k, v);
+  }
+  for (const c of children) e.append(c);
+  return e;
+}
+
+function agoText(s) {
+  if (s < 90) return `${s}秒前`;
+  if (s < 5400) return `${Math.round(s / 60)}分前`;
+  return `${Math.round(s / 3600)}時間前`;
+}
+
+function makeCard(st) {
+  const emoji = el("div", { class: "emoji" });
+  const name = el("div", { class: "name" });
+  const face = el("div", { class: "face" });
+  const seen = el("div", { class: "seen" });
+  const metrics = el("div", { class: "metrics" });
+
+  const nameIn = el("input", { type: "text", maxlength: 20, value: st.name });
+  const sens = el("input", { type: "range", min: 0, max: 1, step: 0.05, value: st.sensitivity });
+  const temper = el("select", {},
+    ...Object.entries(TEMPERAMENT).map(([k, jp]) => {
+      const o = el("option", { value: k }, jp);
+      if (k === st.temperament) o.selected = true;
+      return o;
+    }));
+  const interval = el("select", {},
+    ...[60, 120, 300, 600].map(v => {
+      const o = el("option", { value: v }, `${v}秒`);
+      if (v === st.report_interval_s) o.selected = true;
+      return o;
+    }));
+  const save = el("button", {
+    class: "primary",
+    onclick: async () => {
+      save.textContent = "送信中…";
+      await fetch("/api/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: st.id,
+          name: nameIn.value,
+          sensitivity: parseFloat(sens.value),
+          temperament: temper.value,
+          report_interval_s: parseInt(interval.value, 10),
+        }),
+      });
+      save.textContent = "保存(次回の報告時に反映)";
+      setTimeout(() => (save.textContent = "保存"), 3000);
+    },
+  }, "保存");
+
+  const card = el("div", { class: "card" },
+    el("div", { class: "head" },
+      emoji,
+      el("div", {}, name, face),
+      seen,
+    ),
+    metrics,
+    el("details", {},
+      el("summary", {}, "設定(名前・性格)"),
+      el("div", { class: "form" },
+        el("div", { class: "row" }, el("label", {}, "名前"), nameIn),
+        el("div", { class: "row" }, el("label", {}, "敏感さ"), sens),
+        el("div", { class: "row" }, el("label", {}, "気質"), temper,
+          el("label", {}, "報告間隔"), interval),
+        save,
+      ),
+    ),
+  );
+
+  return { el: card, refs: { emoji, name, face, seen, metrics, nameIn } };
+}
+
+function updateCard(c, st) {
+  const [em, jp] = FACE[st.face] || ["❓", st.face];
+  c.refs.emoji.textContent = em;
+  c.refs.name.textContent = st.name;
+  c.refs.face.textContent = jp;
+  c.refs.seen.textContent = agoText(st.last_seen_s_ago);
+  c.el.classList.toggle("stale", st.last_seen_s_ago > st.report_interval_s * 3 + 60);
+  c.refs.metrics.innerHTML =
+    `<div>温度<b>${st.temp_c.toFixed(1)}°C</b></div>` +
+    `<div>湿度<b>${st.hum_pct.toFixed(0)}%</b></div>` +
+    `<div>照度<b>${Math.round(st.lux)}lx</b></div>` +
+    `<div>電池<b>${st.battery_pct.toFixed(0)}%</b></div>`;
+}
+
+async function refresh() {
+  try {
+    const [data, sys] = await Promise.all([
+      fetch("/api/stickers").then(r => r.json()),
+      fetch("/api/system").then(r => r.json()),
+    ]);
+    document.getElementById("sys").textContent =
+      `稼働 ${Math.round(sys.uptime_s / 60)}分 / ${sys.sta_ip}`;
+    const main = document.getElementById("cards");
+    if (data.stickers.length && main.querySelector(".empty")) main.innerHTML = "";
+    for (const st of data.stickers) {
+      let c = cards.get(st.id);
+      if (!c) {
+        c = makeCard(st);
+        cards.set(st.id, c);
+        main.append(c.el);
+      }
+      updateCard(c, st);
+    }
+  } catch (e) { /* 一時的な通信断は無視 */ }
+}
+
+// WebSocketで報告をリアルタイム反映(来ないときはポーリングで拾う)
+try {
+  const ws = new WebSocket(`ws://${location.host}/ws`);
+  ws.onmessage = () => refresh();
+} catch (e) {}
+
+setInterval(refresh, 5000);
+refresh();
+</script>
+</body>
+</html>

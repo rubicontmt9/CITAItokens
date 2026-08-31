@@ -42,15 +42,18 @@ graph LR
     LIPO["LiPo 500mAh"] --> BAT
 ```
 
-ピン割当(暫定・Phase 1で確定させる):
+ピン割当(FW実装済み: `software/firmware/src/pins.h` と一致。Phase 1で実機確認):
 
 | XIAO ピン | 接続先 | 備考 |
 | --- | --- | --- |
 | GPIO7 (SCK) / GPIO9 (MOSI) | e-Paper SCK / DIN | HW SPI。MISO不使用 |
-| GPIO1 / GPIO2 / GPIO3 / GPIO4 | e-Paper CS / DC / RST / BUSY | |
-| GPIO5 (SDA) / GPIO6 (SCL) | AHT20, LIS3DH, BH1750 | I2Cバス共有(アドレス重複なし) |
-| GPIO8 | LIS3DH INT1 | **RTC GPIOであること**(ディープスリープ起床用)→ Phase 1で実機確認 |
-| BAT+/− | LiPo | 電池電圧はADC分圧で監視(要追加抵抗2本)or 充電IC状態で代用 |
+| GPIO1 (D0) / GPIO2 (D1) | e-Paper CS / DC | |
+| GPIO43 (D6) / GPIO44 (D7) | e-Paper RST / BUSY | UART0ピンだがシリアルはUSB CDC使用のため空く |
+| GPIO5 (SDA) / GPIO6 (SCL) | AHT20, LIS3DH, BH1750 | I2Cバス共有(0x38 / 0x18 / 0x23) |
+| GPIO8 (D9) | LIS3DH INT1 | RTC GPIO(ESP32-S3は0-21)→ ext0起床に使用 |
+| GPIO4 (D3) | 電池電圧ADC | 100kΩ:100kΩ分圧(実電圧の1/2)。ADC1_CH3 |
+| GPIO3 (D2) | 予備 | |
+| BAT+/− | LiPo | XIAO内蔵の充電回路を使用 |
 
 ## 3. 電力収支の概算
 
