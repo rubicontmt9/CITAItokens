@@ -4,6 +4,11 @@
 (`../firmware/lib/emotion_core/`)をPC上で動かし、ブラウザから仮想ステッカーを
 操作・観察できるシミュレーターです。
 
+> 📱 **スマホで試すだけなら** ビルド不要の単体HTML版があります →
+> [`mobile/index.html`](./mobile/index.html)(emotion_coreのJS移植。
+> スマホのブラウザで開くだけ。ロジック・表情描画はC++版と同一の値を移植)。
+> Claudeの公開Artifactとしてもホストされているので、URLを開くだけでも使えます。
+
 ![動作イメージ] ブラウザに電子ペーパー風の画面が並び、温度スライダーや
 「衝撃!」ボタンで表情が変わります。時間加速で「48時間放置→さみしい」や
 電池の減りも数秒で確認できます。
@@ -31,6 +36,24 @@ Windows側のブラウザで **http://localhost:8080** を開きます
 
 macOS/Linuxでも同じ手順で動きます(macOSは `xcode-select --install` でclang++を導入)。
 
+### スマホからPCのシミュレーターにアクセスする(同一Wi-Fi)
+
+```bash
+./persona_sim --host 0.0.0.0        # LAN公開モードで起動
+```
+
+スマホのブラウザで `http://<PCのIPアドレス>:8080` を開きます。
+**WSL2の場合の注意**: WSL2は仮想NAT内で動くため、スマホから届くには
+Windows側でポート転送が必要です。PowerShell(管理者)で:
+
+```powershell
+netsh interface portproxy add v4tov4 listenport=8080 listenaddress=0.0.0.0 connectport=8080 connectaddress=(wsl hostname -I).Trim()
+New-NetFirewallRule -DisplayName "persona_sim" -Direction Inbound -LocalPort 8080 -Protocol TCP -Action Allow
+```
+
+(Windows 11のWSL設定で「ミラーモードネットワーク」を有効にしている場合は転送不要)
+手間を掛けたくない場合は上記の**単体HTML版(mobile/)**をおすすめします。
+
 ## できること
 
 | 操作 | 対応する現実のイベント |
@@ -53,12 +76,16 @@ Valence-Arousal平面上の現在の感情、電池残量(docs/planning/03 の�
 simulator/
 ├── Makefile          # g++一発ビルド(emotion_coreのソースを直接コンパイル)
 ├── src/
-│   ├── main.cpp      # 起動・APIルーティング
-│   ├── http_server.* # 依存ゼロの極小HTTPサーバー(localhost限定)
+│   ├── main.cpp      # 起動・APIルーティング(--port / --host / --web)
+│   ├── http_server.* # 依存ゼロの極小HTTPサーバー(デフォルトlocalhost限定)
 │   ├── sim_world.*   # 仮想世界(起床サイクル・昼夜・電池モデル)
 │   └── json_util.*   # 最小JSON入出力
-└── web/index.html    # ブラウザUI
+├── web/index.html    # PC向けブラウザUI(C++サーバーが配信)
+└── mobile/index.html # 📱スマホ向け単体HTML版(JS移植・ビルド不要)
 ```
+
+> `mobile/index.html` はemotion_coreのJS移植のため、**C++側のロジックや
+> 表情描画を変更したら mobile/ も同じ値に更新すること**(ファイル冒頭に明記)。
 
 シミュレーターと実機の間にロジックの二重管理はありません。感情の挙動を変えたい
 ときは `../firmware/lib/emotion_core/` を変更すれば、FW・シミュレーター・テストの

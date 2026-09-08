@@ -99,9 +99,11 @@ std::string simClock(double t) {
 int main(int argc, char** argv) {
   int port = 8080;
   std::string webdir = "web";
+  std::string host = "127.0.0.1";  // デフォルトはローカル限定
   for (int i = 1; i < argc - 1; ++i) {
     if (strcmp(argv[i], "--port") == 0) port = atoi(argv[i + 1]);
     if (strcmp(argv[i], "--web") == 0) webdir = argv[i + 1];
+    if (strcmp(argv[i], "--host") == 0) host = argv[i + 1];  // 0.0.0.0 でLAN公開
   }
 
   // シミュレーションスレッド: 実時間100ms刻みで仮想世界を進める
@@ -253,7 +255,7 @@ int main(int argc, char** argv) {
   });
 
   printf("PersonaSticker simulator\n");
-  if (!server.run(port)) {
+  if (!server.run(port, host)) {
     fprintf(stderr, "failed to start server on port %d\n", port);
     return 1;
   }

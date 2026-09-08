@@ -26,8 +26,9 @@ class HttpServer {
  public:
   // pathの末尾が '*' なら前方一致、それ以外は完全一致
   void route(const std::string& method, const std::string& path, Handler h);
-  // 127.0.0.1:port で待ち受け(ブロッキング)。bind失敗などでfalse。
-  bool run(int port);
+  // host:port で待ち受け(ブロッキング)。bind失敗などでfalse。
+  // hostは "127.0.0.1"(デフォルト、ローカル限定)または "0.0.0.0"(LAN公開)。
+  bool run(int port, const std::string& host = "127.0.0.1");
 
  private:
   struct Route {

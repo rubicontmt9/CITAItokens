@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- A:HEAD-START -->
+<title>PersonaSticker シミュレーター</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap">
+<style>
+  :root {
+    --bg: #f2f0ea;
+    --card: #ffffff;
+    --ink: #2b2a26;
+    --muted: #8a877e;
+    --line: #dedbd2;
+    --accent: #3a6ea5;
+    --accent-ink: #ffffff;
+    --btn-bg: #faf9f5;
+    /* 電子ペーパーは物理デバイスなのでテーマで変えない */
+    --paper: #ece9e0;
+    --bezel: #b9b5a9;
+    --shadow: 0 4px 14px rgba(43, 42, 38, 0.14);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #201f1c;
+      --card: #2a2925;
+      --ink: #e8e5dc;
+      --muted: #96938a;
+      --line: #3a3833;
+      --accent: #7fa8d0;
+      --accent-ink: #1b2735;
+      --btn-bg: #33322d;
+      --bezel: #4a4841;
+      --shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #201f1c;
+    --card: #2a2925;
+    --ink: #e8e5dc;
+    --muted: #96938a;
+    --line: #3a3833;
+    --accent: #7fa8d0;
+    --accent-ink: #1b2735;
+    --btn-bg: #33322d;
+    --bezel: #4a4841;
+    --shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Hiragino Sans", "Noto Sans JP", "Yu Gothic", system-ui, sans-serif;
+    font-size: 14px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  h1, h2, .face-label, .tab {
+    font-family: "Zen Maru Gothic", "Hiragino Maru Gothic ProN", "Hiragino Sans", sans-serif;
+  }
+  .num { font-variant-numeric: tabular-nums; }
+
+  header {
+    position: sticky; top: 0; z-index: 10;
+    background: var(--card);
+    border-bottom: 1px solid var(--line);
+    padding: 10px 14px 8px;
+  }
+  .head-row { display: flex; align-items: baseline; gap: 10px; }
+  h1 { font-size: 17px; margin: 0; font-weight: 700; }
+  .clock { margin-left: auto; font-size: 12px; color: var(--muted); }
+
+  .accel {
+    display: flex; gap: 4px; margin-top: 8px;
+  }
+  .accel span { font-size: 11px; color: var(--muted); align-self: center; margin-right: 2px; }
+  .accel button {
+    flex: 1; padding: 5px 0; font-size: 12px;
+    border: 1px solid var(--line); border-radius: 8px;
+    background: var(--btn-bg); color: var(--ink);
+  }
+  .accel button.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+
+  .tabs {
+    display: flex; gap: 6px; padding: 10px 14px 0;
+    overflow-x: auto;
+  }
+  .tab {
+    padding: 7px 14px; font-size: 13px; font-weight: 500;
+    border: 1px solid var(--line); border-radius: 999px;
+    background: var(--card); color: var(--muted);
+    white-space: nowrap;
+  }
+  .tab.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
+
+  main { max-width: 480px; margin: 0 auto; padding: 14px 14px 48px; display: grid; gap: 14px; }
+
+  /* ステッカー実機 */
+  .device-wrap { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .device {
+    background: var(--bezel);
+    padding: 10px 10px 22px;
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+    position: relative;
+  }
+  .device::after { /* 「ステッカー」を示す剥がしタブ */
+    content: "";
+    position: absolute; right: -6px; top: 18px;
+    width: 14px; height: 26px;
+    background: var(--bezel);
+    border-radius: 0 6px 6px 0;
+    opacity: .7;
+  }
+  .device canvas {
+    display: block;
+    width: min(62vw, 240px); height: min(62vw, 240px);
+    background: var(--paper);
+    border-radius: 3px;
+    image-rendering: pixelated;
+  }
+  .device.shaking { animation: shake .45s linear; }
+  @keyframes shake {
+    0%,100% { transform: translate(0,0) rotate(0); }
+    20% { transform: translate(-5px,2px) rotate(-2deg); }
+    40% { transform: translate(5px,-2px) rotate(2deg); }
+    60% { transform: translate(-4px,-2px) rotate(-1.5deg); }
+    80% { transform: translate(4px,2px) rotate(1.5deg); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .device.shaking { animation: none; }
+  }
+  .face-label { font-size: 16px; font-weight: 700; color: var(--accent); }
+  .statline { font-size: 12px; color: var(--muted); display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  .statline b { color: var(--ink); font-weight: 600; }
+
+  section {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 12px 14px;
+  }
+  section h2 {
+    font-size: 12px; font-weight: 700; color: var(--muted);
+    margin: 0 0 10px; letter-spacing: .06em;
+  }
+  .row { display: flex; align-items: center; gap: 10px; min-height: 34px; }
+  .row + .row { margin-top: 4px; }
+  .row label { width: 3.5em; flex: none; font-size: 12px; color: var(--muted); }
+  .row output { width: 4.2em; flex: none; text-align: right; font-size: 12px; }
+  input[type=range] { flex: 1; accent-color: var(--accent); min-width: 0; height: 28px; }
+  input[type=text], select {
+    font: inherit; font-size: 14px; padding: 8px;
+    border: 1px solid var(--line); border-radius: 8px;
+    background: var(--btn-bg); color: var(--ink);
+    min-width: 0;
+  }
+  .btns { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 10px; }
+  .btns button, .apply {
+    font: inherit; font-size: 13px; padding: 10px 4px;
+    border: 1px solid var(--line); border-radius: 10px;
+    background: var(--btn-bg); color: var(--ink);
+  }
+  .btns button:active { background: var(--accent); color: var(--accent-ink); }
+  .apply { width: 100%; margin-top: 10px; background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  .check { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); flex: none; }
+  .check input { accent-color: var(--accent); width: 16px; height: 16px; }
+
+  .va-row { display: flex; gap: 14px; align-items: center; }
+  .va-canvas { background: var(--btn-bg); border: 1px solid var(--line); border-radius: 8px; flex: none; }
+  .va-note { font-size: 12px; color: var(--muted); line-height: 1.8; }
+  .va-note b { color: var(--ink); }
+
+  footer { text-align: center; font-size: 11px; color: var(--muted); padding: 0 14px 24px; }
+</style>
+<!-- A:HEAD-END -->
+</head>
+<body>
+<!-- A:BODY-START -->
+<header>
+  <div class="head-row">
+    <h1>🏷️ PersonaSticker</h1>
+    <span class="clock num" id="clock">Day 0 08:00</span>
+  </div>
+  <div class="accel" id="accel">
+    <span>時間加速</span>
+    <button data-a="1">×1</button>
+    <button data-a="60" class="on">×60</button>
+    <button data-a="600">×600</button>
+    <button data-a="3600">×3600</button>
+  </div>
+</header>
+
+<div class="tabs" id="tabs"></div>
+
+<main>
+  <div class="device-wrap">
+    <div class="device" id="device"><canvas id="epd" width="200" height="200"></canvas></div>
+    <div class="face-label" id="faceLabel">--</div>
+    <div class="statline" id="statline"></div>
+  </div>
+
+  <section>
+    <h2>さわる</h2>
+    <div class="btns">
+      <button id="btnPet">なでる</button>
+      <button id="btnShock">衝撃!</button>
+      <button id="btnSustain">ゆらし続ける</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>環境(センサー入力)</h2>
+    <div class="row"><label>温度</label><input type="range" id="sTemp" min="-15" max="45" step="0.5"><output class="num" id="oTemp"></output></div>
+    <div class="row"><label>湿度</label><input type="range" id="sHum" min="0" max="100" step="1"><output class="num" id="oHum"></output></div>
+    <div class="row"><label>照度</label><input type="range" id="sLux" min="0" max="1000" step="5"><output class="num" id="oLux"></output>
+      <span class="check"><input type="checkbox" id="cAuto">昼夜</span></div>
+  </section>
+
+  <section>
+    <h2>こころの状態</h2>
+    <div class="va-row">
+      <canvas class="va-canvas" id="va" width="120" height="120"></canvas>
+      <div class="va-note" id="vaNote"></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>性格・設定</h2>
+    <div class="row"><label>名前</label><input type="text" id="iName" maxlength="20" style="flex:1"></div>
+    <div class="row"><label>敏感さ</label><input type="range" id="sSens" min="0" max="1" step="0.05"><output class="num" id="oSens"></output></div>
+    <div class="row"><label>気質</label>
+      <select id="selTemper" style="flex:1">
+        <option value="cheerful">ほがらか</option>
+        <option value="shy">こわがり</option>
+        <option value="calm">おっとり</option>
+      </select>
+      <label style="width:auto">起床</label>
+      <select id="selInterval">
+        <option value="10">10秒</option>
+        <option value="30">30秒</option>
+        <option value="60">60秒</option>
+        <option value="120" selected>120秒</option>
+        <option value="300">300秒</option>
+      </select>
+    </div>
+    <button class="apply" id="btnApply">適用(次の起床で反映)</button>
+  </section>
+</main>
+
+<footer>
+  ファームウェアの emotion_core と同一ロジックのJS移植版です。実機は起床周期ごとにしか反応しません(それがステッカーの「間」になります)。
+</footer>
+
+<script>
+"use strict";
+// ============================================================================
+// emotion_core (C++) のJS移植。
+// software/firmware/lib/emotion_core/ を変更したら、ここも同じ値に更新すること。
+// ============================================================================
+
+const HUNGRY_PCT = 15.0;
+const FACE_JP = {
+  happy: "うれしい", content: "おだやか", sleepy: "ねむい",
+  cold: "さむい", hot: "あつい", surprised: "びっくり",
+  scared: "こわい", lonely: "さみしい", hungry: "おなかすいた",
+};
+const clampf = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+
+function defaultConfig(name) {
+  return {
+    name, sensitivity: 0.5, temperament: "cheerful",
+    report_interval_s: 120, sync_every_n: 1,
+    th: { cold_c: 10, hot_c: 30, comfort_low_c: 18, comfort_high_c: 26,
+          lonely_h: 48, dark_lux: 10, shock_g: 1.2, pet_g: 0.15 },
+  };
+}
+
+const batteryPercent = mv => clampf((mv - 3300) / 900 * 100, 0, 100);
+
+// --- persona_features.cpp: extractFeatures ---
+function extractFeatures(st, s, th) {
+  const f = {
+    temp_c: s.temp_c, temp_dev: 0, temp_rate: 0, vib_peak_g: s.vib_peak_g,
+    shock: false, sustained_shake: false, petted: false,
+    idle_hours: 0, is_dark: s.lux < th.dark_lux,
+    battery_pct: batteryPercent(s.battery_mv),
+  };
+  if (s.temp_c > th.comfort_high_c) f.temp_dev = s.temp_c - th.comfort_high_c;
+  else if (s.temp_c < th.comfort_low_c) f.temp_dev = s.temp_c - th.comfort_low_c;
+
+  if (!st.initialized) {
+    st.initialized = true;
+    st.prev_temp_c = s.temp_c;
+    st.prev_t = s.t;
+    st.last_motion_t = s.t;
+    st.shake_streak = 0;
+  }
+  if (s.t > st.prev_t) {
+    const dt_min = (s.t - st.prev_t) / 60;
+    if (dt_min > 0.01) f.temp_rate = (s.temp_c - st.prev_temp_c) / dt_min;
+  }
+  if (s.vib_peak_g >= th.shock_g) {
+    f.shock = true;
+    st.shake_streak = Math.min(255, st.shake_streak + 1);
+    st.last_motion_t = s.t;
+  } else if (s.vib_peak_g >= th.pet_g) {
+    f.petted = true;
+    st.shake_streak = 0;
+    st.last_motion_t = s.t;
+  } else {
+    st.shake_streak = 0;
+  }
+  if (st.shake_streak >= 2) { f.sustained_shake = true; f.shock = false; }
+  if (s.t >= st.last_motion_t) f.idle_hours = (s.t - st.last_motion_t) / 3600;
+  st.prev_temp_c = s.temp_c;
+  st.prev_t = s.t;
+  return f;
+}
+
+// --- emotion_engine.cpp ---
+function computeTarget(f, cfg) {
+  let v = 0, a = 0;
+  if (f.temp_dev === 0) v += 0.35;
+  else if (f.temp_dev > 0) {
+    const m = clampf(f.temp_dev / 6, 0, 1);
+    v -= 0.9 * m; a += 0.5 * m;
+  } else {
+    const m = clampf(-f.temp_dev / 6, 0, 1);
+    v -= 0.9 * m; a -= 0.3 * m;
+  }
+  if (f.temp_rate > 0.5 || f.temp_rate < -0.5) a += 0.3;
+  if (f.sustained_shake) { a += 0.8; v -= 0.7; }
+  else if (f.shock) { a += 1.0; v -= 0.3; }
+  else if (f.petted) { v += 0.5; a += 0.2; }
+  if (f.idle_hours > cfg.th.lonely_h) { v -= 0.6; a -= 0.4; }
+  if (f.is_dark) a -= 0.45;
+  const gain = 0.5 + cfg.sensitivity;
+  v *= gain; a *= gain;
+  if (cfg.temperament === "cheerful") v += 0.15;
+  else if (cfg.temperament === "shy") a *= 1.4;
+  return [clampf(v, -1, 1), clampf(a, -1, 1)];
+}
+
+function selectFace(st, f, cfg) {
+  const th = cfg.th, hystC = 0.5, hystVA = 0.05;
+  if (f.battery_pct < HUNGRY_PCT) return "hungry";
+  if (f.sustained_shake) return "scared";
+  if (f.shock) return "surprised";
+  if (st.face === "hot" ? f.temp_c > th.hot_c - hystC : f.temp_c > th.hot_c) return "hot";
+  if (st.face === "cold" ? f.temp_c < th.cold_c + hystC : f.temp_c < th.cold_c) return "cold";
+  if (f.idle_hours > th.lonely_h) return "lonely";
+  const sleepyA = st.face === "sleepy" ? -0.40 : -0.45;
+  if (f.is_dark || st.arousal < sleepyA) return "sleepy";
+  const happyV = st.face === "happy" ? 0.35 - hystVA : 0.35;
+  if (st.valence > happyV) return "happy";
+  return "content";
+}
+
+function emotionUpdate(st, f, cfg) {
+  const [tv, ta] = computeTarget(f, cfg);
+  if (!st.initialized) {
+    st.initialized = true; st.valence = tv; st.arousal = ta;
+  } else {
+    let alpha = cfg.temperament === "calm" ? 0.25 : cfg.temperament === "shy" ? 0.60 : 0.50;
+    if (f.shock || f.sustained_shake) alpha = 0.85;
+    st.valence += alpha * (tv - st.valence);
+    st.arousal += alpha * (ta - st.arousal);
+  }
+  st.valence = clampf(st.valence, -1, 1);
+  st.arousal = clampf(st.arousal, -1, 1);
+  st.face = selectFace(st, f, cfg);
+  return st.face;
+}
+
+// ============================================================================
+// face_renderer.cpp の移植: 200x200・1bit の手続き描画(実機とピクセル一致)
+// ============================================================================
+const W = 200, H = 200, FACE_H = 168;
+
+function FrameBuffer() {
+  this.bits = new Uint8Array(W * H);  // 1=黒
+}
+FrameBuffer.prototype = {
+  clear() { this.bits.fill(0); },
+  set(x, y, black = 1) {
+    if (x < 0 || x >= W || y < 0 || y >= H) return;
+    this.bits[y * W + x] = black ? 1 : 0;
+  },
+  fillRect(x, y, w, h, b = 1) {
+    for (let yy = y; yy < y + h; yy++)
+      for (let xx = x; xx < x + w; xx++) this.set(xx, yy, b);
+  },
+  drawRect(x, y, w, h, b = 1) {
+    this.fillRect(x, y, w, 1, b); this.fillRect(x, y + h - 1, w, 1, b);
+    this.fillRect(x, y, 1, h, b); this.fillRect(x + w - 1, y, 1, h, b);
+  },
+  fillCircle(cx, cy, r, b = 1) {
+    for (let dy = -r; dy <= r; dy++)
+      for (let dx = -r; dx <= r; dx++)
+        if (dx * dx + dy * dy <= r * r) this.set(cx + dx, cy + dy, b);
+  },
+  line(x0, y0, x1, y1, thick, b = 1) {
+    const dx = x1 - x0, dy = y1 - y0;
+    const steps = Math.floor(Math.sqrt(dx * dx + dy * dy)) + 1;
+    const pr = thick > 1 ? (thick / 2) | 0 : 0;
+    for (let i = 0; i <= steps; i++) {
+      const x = x0 + Math.trunc(dx * i / steps), y = y0 + Math.trunc(dy * i / steps);
+      if (pr > 0) this.fillCircle(x, y, pr, b); else this.set(x, y, b);
+    }
+  },
+  arc(cx, cy, r, a0, a1, thick, b = 1) {
+    const pr = thick > 1 ? (thick / 2) | 0 : 0;
+    const steps = (a1 - a0) * 2;
+    if (steps <= 0) return;
+    for (let i = 0; i <= steps; i++) {
+      const a = (a0 + (a1 - a0) * i / steps) * Math.PI / 180;
+      const x = cx + Math.round(r * Math.cos(a)), y = cy + Math.round(r * Math.sin(a));
+      if (pr > 0) this.fillCircle(x, y, pr, b); else this.set(x, y, b);
+    }
+  },
+  text(x, y, s, scale, b = 1) {
+    let cx = x;
+    for (const ch of String(s)) {
+      const col = FONT[ch.toUpperCase()] || FONT["?"];
+      for (let i = 0; i < 5; i++)
+        for (let j = 0; j < 7; j++)
+          if ((col[i] >> j) & 1) this.fillRect(cx + i * scale, y + j * scale, scale, scale, b);
+      cx += 6 * scale;
+    }
+  },
+};
+const textWidth = (s, scale) => s.length > 0 ? (s.length * 6 - 1) * scale : 0;
+
+// 5x7フォント(face_renderer.cppと同一)
+const FONT = {
+  " ": [0,0,0,0,0], "!": [0,0,0x5F,0,0], "%": [0x23,0x13,0x08,0x64,0x62],
+  "-": [8,8,8,8,8], ".": [0,0x60,0x60,0,0], "/": [0x20,0x10,8,4,2],
+  "0": [0x3E,0x51,0x49,0x45,0x3E], "1": [0,0x42,0x7F,0x40,0], "2": [0x42,0x61,0x51,0x49,0x46],
+  "3": [0x21,0x41,0x45,0x4B,0x31], "4": [0x18,0x14,0x12,0x7F,0x10], "5": [0x27,0x45,0x45,0x45,0x39],
+  "6": [0x3C,0x4A,0x49,0x49,0x30], "7": [1,0x71,9,5,3], "8": [0x36,0x49,0x49,0x49,0x36],
+  "9": [6,0x49,0x49,0x29,0x1E], ":": [0,0x36,0x36,0,0], "?": [2,1,0x51,9,6],
+  "A": [0x7E,0x11,0x11,0x11,0x7E], "B": [0x7F,0x49,0x49,0x49,0x36], "C": [0x3E,0x41,0x41,0x41,0x22],
+  "D": [0x7F,0x41,0x41,0x22,0x1C], "E": [0x7F,0x49,0x49,0x49,0x41], "F": [0x7F,9,9,9,1],
+  "G": [0x3E,0x41,0x49,0x49,0x7A], "H": [0x7F,8,8,8,0x7F], "I": [0,0x41,0x7F,0x41,0],
+  "J": [0x20,0x40,0x41,0x3F,1], "K": [0x7F,8,0x14,0x22,0x41], "L": [0x7F,0x40,0x40,0x40,0x40],
+  "M": [0x7F,2,0x0C,2,0x7F], "N": [0x7F,4,8,0x10,0x7F], "O": [0x3E,0x41,0x41,0x41,0x3E],
+  "P": [0x7F,9,9,9,6], "Q": [0x3E,0x41,0x51,0x21,0x5E], "R": [0x7F,9,0x19,0x29,0x46],
+  "S": [0x46,0x49,0x49,0x49,0x31], "T": [1,1,0x7F,1,1], "U": [0x3F,0x40,0x40,0x40,0x3F],
+  "V": [0x1F,0x20,0x40,0x20,0x1F], "W": [0x3F,0x40,0x38,0x40,0x3F], "X": [0x63,0x14,8,0x14,0x63],
+  "Y": [7,8,0x70,8,7], "Z": [0x61,0x51,0x49,0x45,0x43],
+};
+
+const EYE_L = 64, EYE_R = 136, EYE_Y = 78, MOUTH_X = 100, MOUTH_Y = 128;
+
+function openEye(fb, cx, cy, r, pdx = 0, pdy = 0) {
+  fb.fillCircle(cx, cy, r, 1);
+  fb.fillCircle(cx - (r / 3 | 0) + pdx, cy - (r / 3 | 0) + pdy, (r / 4 | 0) + 1, 0);
+}
+function scaredEye(fb, cx, cy) {
+  fb.fillCircle(cx, cy, 15, 1); fb.fillCircle(cx, cy, 12, 0); fb.fillCircle(cx, cy + 3, 4, 1);
+}
+const closedEye = (fb, cx, cy) => fb.arc(cx, cy - 6, 14, 45, 135, 5, 1);
+const happyEye = (fb, cx, cy) => fb.arc(cx, cy + 8, 14, 225, 315, 5, 1);
+function crossEye(fb, cx, cy) {
+  fb.line(cx - 9, cy - 9, cx + 9, cy + 9, 5, 1);
+  fb.line(cx - 9, cy + 9, cx + 9, cy - 9, 5, 1);
+}
+function zigzagMouth(fb, cx, cy, halfW, amp) {
+  const seg = 4, x0 = cx - halfW, w = halfW * 2;
+  for (let i = 0; i < seg; i++) {
+    const xa = x0 + Math.trunc(w * i / seg), xb = x0 + Math.trunc(w * (i + 1) / seg);
+    fb.line(xa, cy + (i % 2 === 0 ? -amp : amp), xb, cy + (i % 2 === 0 ? amp : -amp), 4, 1);
+  }
+}
+function tear(fb, x, y) {
+  fb.fillCircle(x, y + 6, 5, 1);
+  fb.line(x, y - 4, x - 4, y + 4, 3, 1); fb.line(x, y - 4, x + 4, y + 4, 3, 1);
+}
+function sweat(fb, x, y) {
+  fb.fillCircle(x, y + 5, 4, 1);
+  fb.line(x, y - 3, x - 3, y + 3, 2, 1); fb.line(x, y - 3, x + 3, y + 3, 2, 1);
+}
+function snow(fb, cx, cy, r) {
+  fb.line(cx - r, cy, cx + r, cy, 2, 1); fb.line(cx, cy - r, cx, cy + r, 2, 1);
+  fb.line(cx - r + 1, cy - r + 1, cx + r - 1, cy + r - 1, 2, 1);
+  fb.line(cx - r + 1, cy + r - 1, cx + r - 1, cy - r + 1, 2, 1);
+}
+function batteryIcon(fb, x, y, pct) {
+  fb.drawRect(x, y, 24, 12, 1); fb.fillRect(x + 24, y + 3, 3, 6, 1);
+  const fill = Math.trunc(20 * clampf(pct, 0, 100) / 100);
+  if (fill > 0) fb.fillRect(x + 2, y + 2, fill, 8, 1);
+}
+
+function drawFaceOnly(fb, face) {
+  switch (face) {
+    case "happy":
+      happyEye(fb, EYE_L, EYE_Y); happyEye(fb, EYE_R, EYE_Y);
+      fb.arc(MOUTH_X, MOUTH_Y - 8, 28, 30, 150, 6, 1);
+      break;
+    case "content":
+      openEye(fb, EYE_L, EYE_Y, 10); openEye(fb, EYE_R, EYE_Y, 10);
+      fb.arc(MOUTH_X, MOUTH_Y - 6, 18, 40, 140, 4, 1);
+      break;
+    case "sleepy":
+      closedEye(fb, EYE_L, EYE_Y); closedEye(fb, EYE_R, EYE_Y);
+      fb.fillCircle(MOUTH_X, MOUTH_Y + 4, 6, 1); fb.fillCircle(MOUTH_X, MOUTH_Y + 4, 3, 0);
+      fb.text(150, 24, "Z", 3, 1); fb.text(132, 44, "Z", 2, 1);
+      break;
+    case "cold":
+      fb.line(EYE_L - 14, EYE_Y - 22, EYE_L + 10, EYE_Y - 16, 4, 1);
+      fb.line(EYE_R + 14, EYE_Y - 22, EYE_R - 10, EYE_Y - 16, 4, 1);
+      fb.line(EYE_L - 10, EYE_Y, EYE_L + 10, EYE_Y, 5, 1);
+      fb.line(EYE_R - 10, EYE_Y, EYE_R + 10, EYE_Y, 5, 1);
+      zigzagMouth(fb, MOUTH_X, MOUTH_Y, 22, 5);
+      snow(fb, 30, 40, 8); snow(fb, 172, 56, 6);
+      break;
+    case "hot":
+      fb.line(EYE_L - 12, EYE_Y - 18, EYE_L + 12, EYE_Y - 20, 4, 1);
+      fb.line(EYE_R - 12, EYE_Y - 20, EYE_R + 12, EYE_Y - 18, 4, 1);
+      fb.line(EYE_L - 10, EYE_Y, EYE_L + 10, EYE_Y, 5, 1);
+      fb.line(EYE_R - 10, EYE_Y, EYE_R + 10, EYE_Y, 5, 1);
+      fb.fillCircle(MOUTH_X, MOUTH_Y, 13, 1); fb.fillCircle(MOUTH_X, MOUTH_Y, 9, 0);
+      fb.fillRect(MOUTH_X - 13, MOUTH_Y - 13, 27, 13, 0);
+      fb.line(MOUTH_X - 13, MOUTH_Y, MOUTH_X + 13, MOUTH_Y, 3, 1);
+      sweat(fb, 168, 44); sweat(fb, 34, 58);
+      break;
+    case "surprised":
+      openEye(fb, EYE_L, EYE_Y, 15); openEye(fb, EYE_R, EYE_Y, 15);
+      fb.fillCircle(MOUTH_X, MOUTH_Y + 4, 10, 1); fb.fillCircle(MOUTH_X, MOUTH_Y + 4, 6, 0);
+      fb.line(24, 30, 40, 44, 3, 1); fb.line(176, 30, 160, 44, 3, 1);
+      fb.line(100, 16, 100, 34, 3, 1);
+      break;
+    case "scared":
+      scaredEye(fb, EYE_L, EYE_Y); scaredEye(fb, EYE_R, EYE_Y);
+      zigzagMouth(fb, MOUTH_X, MOUTH_Y + 2, 24, 6);
+      fb.line(20, 60, 26, 80, 2, 1); fb.line(180, 60, 174, 80, 2, 1);
+      break;
+    case "lonely":
+      openEye(fb, EYE_L, EYE_Y + 2, 10, 0, 4); openEye(fb, EYE_R, EYE_Y + 2, 10, 0, 4);
+      tear(fb, EYE_L - 18, EYE_Y + 20);
+      fb.arc(MOUTH_X, MOUTH_Y + 16, 20, 220, 320, 4, 1);
+      break;
+    case "hungry":
+      crossEye(fb, EYE_L, EYE_Y); crossEye(fb, EYE_R, EYE_Y);
+      fb.fillCircle(MOUTH_X, MOUTH_Y + 2, 11, 1); fb.fillCircle(MOUTH_X, MOUTH_Y + 2, 7, 0);
+      fb.drawRect(76, 20, 36, 18, 1); fb.fillRect(112, 25, 5, 8, 1);
+      fb.text(124, 22, "!", 2, 1);
+      break;
+    default:
+      openEye(fb, EYE_L, EYE_Y, 10); openEye(fb, EYE_R, EYE_Y, 10);
+      fb.line(MOUTH_X - 14, MOUTH_Y, MOUTH_X + 14, MOUTH_Y, 4, 1);
+  }
+}
+
+function renderFace(fb, face, name, tempC, batteryPct) {
+  fb.clear();
+  drawFaceOnly(fb, face);
+  fb.fillRect(0, FACE_H + 2, W, 2, 1);
+  fb.text(6, FACE_H + 10, name, 2, 1);
+  const t = tempC.toFixed(1) + "C";
+  fb.text(196 - textWidth(t, 1), FACE_H + 22, t, 1, 1);
+  batteryIcon(fb, 169, FACE_H + 8, batteryPct);
+}
+
+// ============================================================================
+// sim_world.cpp の移植: 仮想世界(起床サイクル・昼夜・電池モデル)
+// ============================================================================
+const CAPACITY_MAH = 500;
+const SIM_START_T = 8 * 3600;  // Day0 08:00
+
+function makeSticker(name, preset) {
+  const st = {
+    cfg: defaultConfig(name),
+    fstate: { initialized: false, prev_temp_c: 0, prev_t: 0, last_motion_t: 0, shake_streak: 0 },
+    estate: { initialized: false, valence: 0, arousal: 0, face: "content" },
+    env_temp_c: 24, env_hum_pct: 50, lux_auto: true, lux_manual: 300,
+    pending_vib_g: 0, sustained_remaining: 0, wake_now: false,
+    battery_mah: CAPACITY_MAH,
+    next_wake_t: SIM_START_T, wake_count: 0,
+    fb: new FrameBuffer(), frame_seq: 0, last_face: null,
+    last_sample: null, last_features: null,
+  };
+  applyPreset(st, preset);
+  return st;
+}
+
+function applyPreset(st, preset) {
+  if (preset === "fridge") {
+    st.cfg.name = "FRIDGE"; st.env_temp_c = 5; st.env_hum_pct = 60;
+    st.lux_auto = false; st.lux_manual = 40; st.cfg.temperament = "cheerful";
+  } else if (preset === "plant") {
+    st.cfg.name = "PLANT"; st.env_temp_c = 24; st.env_hum_pct = 55;
+    st.lux_auto = true; st.cfg.temperament = "cheerful"; st.cfg.th.lonely_h = 24;
+  } else if (preset === "guitar") {
+    st.cfg.name = "GUITAR"; st.env_temp_c = 22; st.env_hum_pct = 45;
+    st.lux_auto = false; st.lux_manual = 3; st.cfg.temperament = "shy";
+    st.cfg.th.lonely_h = 12;
+  }
+}
+
+const world = {
+  sim_t: SIM_START_T,
+  accel: 60,
+  stickers: [makeSticker("FRIDGE", "fridge"), makeSticker("PLANT", "plant"), makeSticker("GUITAR", "guitar")],
+  active: 0,
+};
+
+function autoLux(t) {
+  const hour = (t / 3600) % 24;
+  return (hour >= 6 && hour <= 18) ? 100 + 400 * Math.sin(Math.PI * (hour - 6) / 12) : 0.5;
+}
+const batteryMv = st => Math.round(3300 + 900 * clampf(st.battery_mah / CAPACITY_MAH, 0, 1));
+
+function wakeCycle(st, motionWake) {
+  const s = {
+    temp_c: st.env_temp_c, hum_pct: st.env_hum_pct,
+    lux: st.lux_auto ? autoLux(world.sim_t) : st.lux_manual,
+    vib_peak_g: st.pending_vib_g, motion_wake: motionWake,
+    battery_mv: batteryMv(st), t: Math.floor(world.sim_t),
+  };
+  st.pending_vib_g = 0;
+  const f = extractFeatures(st.fstate, s, st.cfg.th);
+  const face = emotionUpdate(st.estate, f, st.cfg);
+  st.last_sample = s;
+  st.last_features = f;
+
+  // 電池消費モデル(docs/planning/03)
+  st.battery_mah -= 40 * 0.5 / 3600;                       // 起床+センサー読取
+  if (st.wake_count % st.cfg.sync_every_n === 0) st.battery_mah -= 100 * 3 / 3600;  // メッシュ同期
+  if (face !== st.last_face) {
+    renderFace(st.fb, face, st.cfg.name, s.temp_c, batteryPercent(s.battery_mv));
+    st.frame_seq++;
+    st.last_face = face;
+    st.battery_mah -= 8 * 0.3 / 3600;                      // e-paper書き換え
+  }
+  st.battery_mah = Math.max(0, st.battery_mah);
+  st.wake_count++;
+
+  if (st.sustained_remaining > 0) {
+    st.sustained_remaining--;
+    st.pending_vib_g = 1.6;
+    st.wake_now = true;
+    st.next_wake_t = world.sim_t + 2;
+  } else {
+    st.next_wake_t = world.sim_t + st.cfg.report_interval_s;
+  }
+}
+
+function tick(realDt) {
+  const target = world.sim_t + realDt * world.accel;
+  const span = target - world.sim_t;
+  for (const st of world.stickers) {
+    st.battery_mah = Math.max(0, st.battery_mah - 0.02 * span / 3600);  // スリープ暗電流
+  }
+  let guard = 0;
+  while (guard++ < 5000) {
+    let did = false;
+    for (const st of world.stickers) {
+      if (st.wake_now) { st.wake_now = false; wakeCycle(st, true); did = true; }
+    }
+    if (did) continue;
+    let next = null;
+    for (const st of world.stickers) if (!next || st.next_wake_t < next.next_wake_t) next = st;
+    if (!next || next.next_wake_t > target) break;
+    world.sim_t = Math.max(world.sim_t, next.next_wake_t);
+    wakeCycle(next, false);
+  }
+  world.sim_t = target;
+}
+
+// ============================================================================
+// UI
+// ============================================================================
+const $ = id => document.getElementById(id);
+const PAPER = [0xEC, 0xE9, 0xE0], INK = [0x23, 0x22, 0x1F];
+
+let shownSeq = -1;
+let flashUntil = 0;  // 電子ペーパーの書き換えフラッシュ演出
+
+function drawEpd(canvas, fb, invert) {
+  const ctx = canvas.getContext("2d");
+  const img = ctx.createImageData(W, H);
+  const [bg, fg] = invert ? [INK, PAPER] : [PAPER, INK];
+  for (let i = 0; i < W * H; i++) {
+    const c = fb.bits[i] ? fg : bg;
+    img.data[i * 4] = c[0]; img.data[i * 4 + 1] = c[1]; img.data[i * 4 + 2] = c[2];
+    img.data[i * 4 + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
+function drawVA(v, a) {
+  const c = $("va"), ctx = c.getContext("2d"), s = c.width;
+  const style = getComputedStyle(document.body);
+  ctx.clearRect(0, 0, s, s);
+  ctx.strokeStyle = style.getPropertyValue("--line");
+  ctx.beginPath();
+  ctx.moveTo(s / 2, 4); ctx.lineTo(s / 2, s - 4);
+  ctx.moveTo(4, s / 2); ctx.lineTo(s - 4, s / 2);
+  ctx.stroke();
+  ctx.fillStyle = style.getPropertyValue("--muted");
+  ctx.font = "10px sans-serif";
+  ctx.fillText("快", s - 16, s / 2 - 5);
+  ctx.fillText("不快", 4, s / 2 - 5);
+  ctx.fillText("覚醒", s / 2 + 4, 12);
+  ctx.fillText("鎮静", s / 2 + 4, s - 5);
+  ctx.fillStyle = style.getPropertyValue("--accent");
+  ctx.beginPath();
+  ctx.arc(s / 2 + v * (s / 2 - 10), s / 2 - a * (s / 2 - 10), 6, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function fmtClock(t) {
+  const day = Math.floor(t / 86400);
+  const hh = String(Math.floor(t / 3600) % 24).padStart(2, "0");
+  const mm = String(Math.floor(t / 60) % 60).padStart(2, "0");
+  return `Day ${day} ${hh}:${mm}`;
+}
+
+function activeSticker() { return world.stickers[world.active]; }
+
+function syncControls() {
+  const st = activeSticker();
+  $("sTemp").value = st.env_temp_c; $("oTemp").textContent = `${st.env_temp_c}°C`;
+  $("sHum").value = st.env_hum_pct; $("oHum").textContent = `${st.env_hum_pct}%`;
+  $("cAuto").checked = st.lux_auto;
+  if (!st.lux_auto) { $("sLux").value = st.lux_manual; $("oLux").textContent = `${st.lux_manual}lx`; }
+  $("iName").value = st.cfg.name;
+  $("sSens").value = st.cfg.sensitivity; $("oSens").textContent = st.cfg.sensitivity.toFixed(2);
+  $("selTemper").value = st.cfg.temperament;
+  $("selInterval").value = String(st.cfg.report_interval_s);
+  shownSeq = -1;  // タブ切替時に必ず再描画
+}
+
+function renderTabs() {
+  const tabs = $("tabs");
+  tabs.innerHTML = "";
+  world.stickers.forEach((st, i) => {
+    const b = document.createElement("button");
+    b.className = "tab" + (i === world.active ? " on" : "");
+    b.textContent = st.cfg.name;
+    b.onclick = () => { world.active = i; renderTabs(); syncControls(); };
+    tabs.append(b);
+  });
+  const add = document.createElement("button");
+  add.className = "tab";
+  add.textContent = "+";
+  add.onclick = () => {
+    const name = prompt("名前(英数字)", "NEW");
+    if (!name) return;
+    world.stickers.push(makeSticker(name.toUpperCase(), ""));
+    world.active = world.stickers.length - 1;
+    renderTabs(); syncControls();
+  };
+  tabs.append(add);
+}
+
+function refresh() {
+  const st = activeSticker();
+  $("clock").textContent = fmtClock(world.sim_t);
+  if (st.last_face) {
+    $("faceLabel").textContent = FACE_JP[st.last_face] || st.last_face;
+    const f = st.last_features, s = st.last_sample;
+    $("statline").innerHTML =
+      `<span>温度 <b class="num">${s.temp_c.toFixed(1)}°C</b></span>` +
+      `<span>照度 <b class="num">${Math.round(s.lux)}lx</b></span>` +
+      `<span>放置 <b class="num">${f.idle_hours.toFixed(1)}h</b></span>` +
+      `<span>電池 <b class="num">${batteryPercent(s.battery_mv).toFixed(0)}%</b></span>` +
+      `<span>起床 <b class="num">${st.wake_count}回</b></span>`;
+    drawVA(st.estate.valence, st.estate.arousal);
+    $("vaNote").innerHTML =
+      `快: <b class="num">${st.estate.valence.toFixed(2)}</b><br>` +
+      `覚醒: <b class="num">${st.estate.arousal.toFixed(2)}</b><br>` +
+      `気質: <b>${{cheerful:"ほがらか",shy:"こわがり",calm:"おっとり"}[st.cfg.temperament]}</b>`;
+    const now = performance.now();
+    if (st.frame_seq !== shownSeq) {
+      shownSeq = st.frame_seq;
+      flashUntil = now + 120;  // 書き換え時の反転フラッシュ(e-paper風)
+      drawEpd($("epd"), st.fb, true);
+    } else if (flashUntil && now > flashUntil) {
+      flashUntil = 0;
+      drawEpd($("epd"), st.fb, false);
+    }
+    if (st.lux_auto && document.activeElement !== $("sLux")) {
+      $("sLux").value = Math.round(s.lux);
+      $("oLux").textContent = `${Math.round(s.lux)}lx`;
+    }
+  }
+}
+
+// --- イベント ---
+$("sTemp").addEventListener("input", e => {
+  activeSticker().env_temp_c = parseFloat(e.target.value);
+  $("oTemp").textContent = `${e.target.value}°C`;
+});
+$("sHum").addEventListener("input", e => {
+  activeSticker().env_hum_pct = parseFloat(e.target.value);
+  $("oHum").textContent = `${e.target.value}%`;
+});
+$("sLux").addEventListener("input", e => {
+  const st = activeSticker();
+  st.lux_manual = parseFloat(e.target.value);
+  st.lux_auto = false;
+  $("cAuto").checked = false;
+  $("oLux").textContent = `${e.target.value}lx`;
+});
+$("cAuto").addEventListener("change", e => { activeSticker().lux_auto = e.target.checked; });
+$("sSens").addEventListener("input", e => { $("oSens").textContent = parseFloat(e.target.value).toFixed(2); });
+
+function shake(strength, sustained) {
+  const st = activeSticker();
+  st.pending_vib_g = strength;
+  st.wake_now = true;
+  if (sustained) st.sustained_remaining = 4;
+  const dev = $("device");
+  dev.classList.remove("shaking");
+  if (strength >= 1) { void dev.offsetWidth; dev.classList.add("shaking"); }
+}
+$("btnPet").onclick = () => shake(0.3, false);
+$("btnShock").onclick = () => shake(1.6, false);
+$("btnSustain").onclick = () => shake(1.6, true);
+
+$("btnApply").onclick = () => {
+  const st = activeSticker();
+  st.cfg.name = ($("iName").value || "STICKER").toUpperCase();
+  st.cfg.sensitivity = parseFloat($("sSens").value);
+  st.cfg.temperament = $("selTemper").value;
+  st.cfg.report_interval_s = parseInt($("selInterval").value, 10);
+  if (st.next_wake_t > world.sim_t + 2) st.next_wake_t = world.sim_t + 2;
+  renderTabs();
+};
+
+$("accel").addEventListener("click", e => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  world.accel = parseFloat(b.dataset.a);
+  for (const x of $("accel").querySelectorAll("button")) x.classList.toggle("on", x === b);
+});
+
+// --- メインループ ---
+let prev = performance.now();
+setInterval(() => {
+  const now = performance.now();
+  tick((now - prev) / 1000);
+  prev = now;
+  refresh();
+}, 100);
+
+renderTabs();
+syncControls();
+tick(0.01);
+refresh();
+</script>
+<!-- A:BODY-END -->
+</body>
+</html>

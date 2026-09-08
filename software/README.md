@@ -13,6 +13,7 @@ software/
 │   ├── data/               # ゲートウェイWeb UI (LittleFS)
 │   └── test/               # 共有コアのユニットテスト (pio test -e native)
 └── simulator/   # PCシミュレーター(共有コアをそのまま実行、ブラウザUI)
+    └── mobile/  # 📱スマホ向け単体HTML版(JS移植・開くだけで動く)
 ```
 
 ## 使い分け
@@ -20,6 +21,7 @@ software/
 | やりたいこと | 場所 |
 | --- | --- |
 | 実機なしで感情・表情の挙動を見る/調整する | [`simulator/`](./simulator/README.md) — `make && ./persona_sim` |
+| **スマホで手軽に試す** | `simulator/mobile/index.html` をブラウザで開く(ビルド不要) |
 | 実機(XIAO ESP32S3)へ書き込む | [`firmware/`](./firmware/README.md) — `pio run -e node -t upload` |
 | 感情エンジンや表情デザインを変更する | `firmware/lib/emotion_core/` — **FW・シミュレーター・テスト全部に反映される** |
 | ロジックの回帰テスト | `firmware/` で `pio test -e native` |
