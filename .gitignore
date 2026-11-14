@@ -1,6 +1,8 @@
 # ==== PlatformIO (software/firmware/) ====
 software/firmware/.pio/
 software/firmware/.vscode/
+software/firmware_pico4ml/.pio/
+software/firmware_pico4ml/.vscode/
 
 # ==== シミュレーター (software/simulator/) ====
 software/simulator/persona_sim
