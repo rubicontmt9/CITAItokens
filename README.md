@@ -16,6 +16,8 @@ CITAItokens/
 │               # The game itself (Unity / C#)
 ├── hardware/   # 専用ハードウェア設計 (自作PCB / KiCad)
 │               # Dedicated custom hardware design (custom PCB / KiCad)
+├── simulator/  # 人間 vs AI 仮想トレードシミュレータ (Python / Web / MCP)
+│               # Virtual stock/FX trading simulator for humans vs AI
 └── README.md   # この案内ファイル / This guide file
 ```
 
@@ -23,6 +25,7 @@ CITAItokens/
 | --- | --- | --- |
 | [`software/`](./software/README.md) | Unity 製ゲーム本体 / Unity-based game | [software/README.md](./software/README.md) |
 | [`hardware/`](./hardware/README.md) | 自作PCBハードウェア設計 / Custom PCB hardware design | [hardware/README.md](./hardware/README.md) |
+| [`simulator/`](./simulator/README.md) | 仮想株式・為替シミュレータ / Virtual market simulator | [simulator/README.md](./simulator/README.md) |
 
 ---
 
