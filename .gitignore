@@ -40,3 +40,8 @@ hardware/**/*~
 .DS_Store
 Thumbs.db
 *.log
+
+# ==== Simulator (simulator/) ====
+simulator/data/
+__pycache__/
+.pytest_cache/

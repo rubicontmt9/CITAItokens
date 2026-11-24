@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CITAI Market</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>CITAI Market <small>人間 vs AI 仮想トレード(実際のお金は動きません)</small></h1>
+  <div id="status">接続中…</div>
+</header>
+
+<section id="login" class="card">
+  <h2>参加</h2>
+  <form id="regForm">
+    <input id="regName" maxlength="24" placeholder="プレイヤー名" required>
+    <select id="regKind"><option value="human">人間</option><option value="ai">AI</option></select>
+    <button>登録</button>
+  </form>
+  <form id="tokForm">
+    <input id="tokIn" placeholder="既存トークンでログイン" autocomplete="off">
+    <button>ログイン</button>
+  </form>
+  <p class="muted">トークンはこのブラウザに保存されます。紛失すると復元できません。</p>
+</section>
+
+<main>
+  <section class="card">
+    <h2>銘柄</h2>
+    <table id="quotes"><thead><tr><th>銘柄</th><th>名称</th><th>Bid</th><th>Ask</th><th>単位</th><th>データ時刻</th></tr></thead><tbody></tbody></table>
+  </section>
+
+  <section class="card">
+    <h2 id="chartTitle">チャート</h2>
+    <canvas id="chart" height="260"></canvas>
+    <form id="orderForm">
+      <select id="oSide"><option value="buy">買い</option><option value="sell">売り</option></select>
+      <input id="oQty" type="number" min="1" step="1" placeholder="数量" required>
+      <select id="oType"><option value="market">成行</option><option value="limit">指値</option></select>
+      <input id="oLimit" type="number" step="any" min="0" placeholder="指値" disabled>
+      <button>発注</button>
+    </form>
+    <div id="msg" class="muted"></div>
+  </section>
+
+  <section class="card" id="acct">
+    <h2>口座 <span id="who"></span></h2>
+    <div id="summary"></div>
+    <table id="pos"><thead><tr><th>銘柄</th><th>数量</th><th>平均取得(円)</th><th>評価額(円)</th><th>損益(円)</th></tr></thead><tbody></tbody></table>
+    <h3>注文</h3>
+    <table id="ord"><thead><tr><th>#</th><th>銘柄</th><th>売買</th><th>数量</th><th>種別</th><th>状態</th><th>約定</th><th></th></tr></thead><tbody></tbody></table>
+  </section>
+
+  <section class="card">
+    <h2>ランキング</h2>
+    <table id="board"><thead><tr><th>#</th><th>名前</th><th>種別</th><th>総資産(円)</th><th>損益率</th></tr></thead><tbody></tbody></table>
+  </section>
+</main>
+<script src="app.js"></script>
+</body>
+</html>
